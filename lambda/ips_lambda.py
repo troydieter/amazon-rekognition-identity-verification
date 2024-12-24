@@ -2,10 +2,13 @@ import boto3
 import sys
 import json
 import base64
-
+import logging
+import os
 
 def lambda_handler(event, context):
 
+  logger = logging.getLogger()
+  logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
   client = boto3.client('rekognition')
 
   payload_dict = json.loads(json.loads(event['body']))

@@ -2,9 +2,9 @@ import requests
 from base64 import b64encode
 from json import dumps
 
-SOURCE = "idplusselfi_api\\JohnDoe-DL.jpg"
-TARGET = "idplusselfi_api\\JohnDoe-Selfie.jpg"
-URL = "https://<your api gateway>.<your region>.amazonaws.com/prod/ips"
+SOURCE = "idplusselfi_api/test001_dl.jpg"
+TARGET = "idplusselfi_api/JohnDoe-Selfie.jpg"
+URL = "https://s8f6dt22g0.execute-api.us-east-1.amazonaws.com/prod/ips"
 ENCODING = 'utf-8'
 JSON_NAME = 'output.json'
 
