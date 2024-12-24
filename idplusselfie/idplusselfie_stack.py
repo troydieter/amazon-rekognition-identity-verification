@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_apigateway as apigateway,
     aws_logs as logs,
+    CfnOutput
 )
 from constructs import Construct
 
@@ -43,6 +44,26 @@ class IdPlusSelfieStack(Stack):
             proxy=False,
         )
 
+        # Create an API key
+        api_key = api.add_api_key("IpsApiKey")
+
+        # Create a usage plan
+        usage_plan = api.add_usage_plan("IpsUsagePlan",
+            name="IPS Usage Plan",
+            throttle=apigateway.ThrottleSettings(
+                rate_limit=10,
+                burst_limit=2
+            )
+        )
+
+        # Associate the API key with the usage plan
+        usage_plan.add_api_key(api_key)
+
+        # Associate the usage plan with the API's deployment stage
+        usage_plan.add_api_stage(
+            stage=api.deployment_stage
+        )
+
         # Enable API Gateway access logs
         log_group = logs.LogGroup(
             self,
@@ -69,19 +90,17 @@ class IdPlusSelfieStack(Stack):
 
         # Define API Gateway resource and method
         ips_resource = api.root.add_resource("ips")
-        ips_resource.add_method("POST")  # POST /ips
-
-
+        ips_resource.add_method("POST", api_key_required=True)  # POST /ips
 
         # Outputs to assist debugging and deployment
-        self.output_api_url(api)
+        self.output_api_url(api, api_key)
 
-    def output_api_url(self, api: apigateway.RestApi):
-        from aws_cdk import CfnOutput
-
+    def output_api_url(self, api: apigateway.RestApi, api_key: apigateway.IApiKey):
         CfnOutput(
             self,
             "ApiUrl",
             value=api.url,
             description="The base URL of the IdPlusSelfie API",
         )
+        # Output the API key (for demonstration purposes)
+        CfnOutput(self, "ApiKey", value=api_key.key_id, description="API Key ID")
