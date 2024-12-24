@@ -4,7 +4,7 @@ from json import dumps
 
 SOURCE = "idplusselfi_api/test001_dl.jpg"
 TARGET = "idplusselfi_api/test001_selfie.jpg"
-URL = "https://bx82mjsle8.execute-api.us-east-1.amazonaws.com/prod/ips"
+URL = "https://xyz.execute-api.us-east-1.amazonaws.com/prod/ips"
 ENCODING = 'utf-8'
 JSON_NAME = 'output.json'
 
