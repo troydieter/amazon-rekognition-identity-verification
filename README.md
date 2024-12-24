@@ -1,50 +1,61 @@
-
 # ID Plus Selfie Identity Verification with Amazon Rekognition
 
-A solution to digitally verfiy a users identity using Amazon Rekognition.
+A robust solution for digital identity verification using Amazon Rekognition.
 
-Source                     | Target
-:-------------------------:|:-------------------------:
-![Source](../amazon-rekognition-identity-verification-example/Documentation/readme_images/JohnDoe-DL.jpg) | ![Target](../amazon-rekognition-identity-verification-example/Documentation/readme_images/JohnDoe-Selfie.jpg)
-## Flow
-A user submits an POST call to a REST api with the source and target. Source being the selfie and target
-the users drivers license.  Identity matching occurs on the backend and a confidence percentage is returned.
+## Overview
 
-![Diagram](../amazon-rekognition-identity-verification-example/Documentation/readme_images/idplusselfie_diagram.jpg)
+This project provides a serverless API for comparing a user's selfie with their driver's license photo, leveraging the power of Amazon Rekognition for accurate face matching.
 
-## Deploy the project
-This project is available to deploy through AWS CDK <repo link>.  You can clone the repository and use the following CDK process to deploy to your local AWS account.
-1. Setup a user who has permissions to programmatically deploy the resources listed above through AWS CDK
-2. Setup your AWS CLI configuration - https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html
-3. If this is your first time using CDK go to the following link and follow the prerequisites https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-python.html   
-4. Clone the repository <git hub link>
-5. Create the virtual environment
-   1. If using Windows run the following command in your terminal window from the source of the cloned repository
-   .venv\Scripts\activate
-   2. If using Mac or Linux run the following command in your terminal window from the source of the cloned repository source
-   .venv/bin/activate
-6. After activating the virtual environment install the app’s standard dependencies:
-python -m pip install -r requirements.txt
-7. Now that the environment is setup and the requirements are met we can issue the AWS CDK deployment command to deploy this project to AWS
+## Architecture
+
+![Diagram](diagram_mermaid.svg)
+
+## How It Works
+
+1. User submits a POST request to the REST API with base64 encoded images of their selfie and driver's license.
+2. The Lambda function processes the request and uses Amazon Rekognition to compare the faces.
+3. A confidence percentage is returned, indicating the likelihood of a match.
+
+## Deployment
+
+This project uses AWS CDK for infrastructure as code. Follow these steps to deploy:
+
+1. Ensure you have an AWS account and a user with appropriate permissions.
+2. Set up the AWS CLI: [AWS CLI Configuration Guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
+3. Install AWS CDK: [CDK Python Guide](https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-python.html)
+4. Clone the repository: `git clone <repository-url>`
+5. Navigate to the project directory and create a virtual environment:
+   - Windows: `.venv\Scripts\activate`
+   - Mac/Linux: `source .venv/bin/activate`
+6. Install dependencies: `python -m pip install -r requirements.txt`
+7. Deploy the stack: `cdk deploy`
+
+## Usage
+
+To make API calls, use the `main.py` script in the `idplusselfie_api` directory:
+
+1. Update the `SOURCE`, `TARGET`, `API_KEY` and `URL` variables in `.\idplusselfi_api\main.py`.
+2. Run the script: `python main.py`
+
+## Good to Know
+
+- **AWS CDK**: Allows you to define cloud infrastructure in code and provision it through AWS CloudFormation.
+- **Amazon Rekognition**: Provides pre-trained and customizable computer vision (CV) capabilities to extract information and insights from your images and videos.
+- **API Gateway**: Manages the REST API, handling request/response cycles and integrating with Lambda.
+- **Lambda**: Runs your code in response to events and automatically manages the underlying compute resources.
+
+## Clean Up
+
+To remove all deployed resources:
+
 ```
-CDK Deploy
+cdk destroy
 ```
 
-## Making API Calls
-We need to send the payload in base64 format to the rest endpoint.  We use a python file main.py located in the idplusselfie_api directory to make the api call which allows us to open the source and target files, convert them to base64 and send the payload to the api gateway.  
-
-NOTE: The SOURCE and TARGET file locations will be on your local file system and the URL is the Amazon API Gateway url generated during the creation of the project.
-
-
-
-Clean Up
-We used the AWS CDK to build this project, therefore we can open our project locally and issue the AWS CDK command to clean up the resources.
-```
-CDK Destroy
-```
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
 ## License
-This library is licensed under the MIT-0 License. See the LICENSE file.
+
+This project is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file for details.
