@@ -8,6 +8,9 @@ This project provides a serverless API for comparing a user's selfie with their 
 
 ## Architecture
 
+### AWS Solution Architecture
+![Visual AWS Architecture](visual_diagram.png)
+### Resource Flow
 ![Diagram](diagram_mermaid.svg)
 
 ## How It Works
