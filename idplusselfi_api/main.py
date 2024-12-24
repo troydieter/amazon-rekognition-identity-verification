@@ -5,6 +5,7 @@ from json import dumps
 SOURCE = "idplusselfi_api/test001_dl.jpg"
 TARGET = "idplusselfi_api/test001_selfie.jpg"
 URL = "https://xyz.execute-api.us-east-1.amazonaws.com/prod/ips"
+API_KEY = "your-api-key-here"  # Replace with your actual API key
 ENCODING = 'utf-8'
 JSON_NAME = 'output.json'
 
@@ -31,11 +32,15 @@ raw_data = {
 # now: encoding the data to json
 json_data = dumps(raw_data, indent=2)
 
-response = requests.post(url=URL, json=json_data)
+# Set up the headers with the API key
+headers = {
+    'x-api-key': API_KEY,
+    'Content-Type': 'application/json'
+}
+
+# Make the POST request with the API key in the headers
+response = requests.post(url=URL, json=json_data, headers=headers)
 response.raise_for_status()
 
 print("Status Code", response.status_code)
 print("Body ", response.json())
-
-
-
