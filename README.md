@@ -20,17 +20,11 @@ This project provides a serverless API for comparing a user's selfie with their 
 ### AWS Resource Flow / Connectivity
 ![Diagram](diagram_mermaid.svg)
 
-## How It Works
-
-1. User submits a POST request to the REST API with base64 encoded images of their selfie and driver's license.
-2. The Lambda function processes the request and uses Amazon Rekognition to compare the faces.
-3. A confidence percentage is returned, indicating the likelihood of a match.
-
 ## Deployment
 
-This project uses AWS CDK for infrastructure as code. Follow these steps to deploy:
+This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.173.2`) for infrastructure as code. Follow these steps to deploy:
 
-1. Ensure you have an AWS account and a user with appropriate permissions.
+1. Ensure you have an AWS account and an AWS IAM user/role with appropriate permissions.
 2. Set up the AWS CLI: [AWS CLI Configuration Guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
 3. Install AWS CDK: [CDK Python Guide](https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-python.html)
 4. Clone the repository: `git clone <repository-url>`
