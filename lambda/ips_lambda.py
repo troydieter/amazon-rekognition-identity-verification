@@ -1,38 +1,45 @@
 import boto3
-import sys
 import json
 import base64
 import logging
 import os
 
 def lambda_handler(event, context):
+    logger = logging.getLogger()
+    logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    client = boto3.client('rekognition')
 
-  logger = logging.getLogger()
-  logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-  client = boto3.client('rekognition')
+    try:
+        payload_dict = json.loads(event['body'])
+        selfie = payload_dict['selfie']
+        dl = payload_dict['dl']
 
-  payload_dict = json.loads(json.loads(event['body']))
-  selfie = payload_dict['selfie']
-  dl = payload_dict['dl']
+        # Convert base64 to bytes
+        s_bytes = base64.b64decode(dl)
+        t_bytes = base64.b64decode(selfie)
 
-  # convert text to base64
-  s_base64 = dl.encode('utf-8')
-  t_base64 = selfie.encode('utf-8')
-  #convert base64 to bytes
-  s_bytes = base64.b64decode(s_base64)
-  t_bytes = base64.b64decode(t_base64)
-  response = client.compare_faces(SimilarityThreshold=80,
-                                SourceImage={'Bytes': s_bytes},
-                                TargetImage={'Bytes': t_bytes})
+        response = client.compare_faces(
+            SimilarityThreshold=80,
+            SourceImage={'Bytes': s_bytes},
+            TargetImage={'Bytes': t_bytes}
+        )
 
-  for faceMatch in response['FaceMatches']:
-      position = faceMatch['Face']['BoundingBox']
-      similarity = str(faceMatch['Similarity'])
+        if not response['FaceMatches']:
+            return {
+                'statusCode': 200,
+                'body': json.dumps({'similarity': 0, 'message': 'No face matches found'})
+            }
 
-  return {
+        similarity = response['FaceMatches'][0]['Similarity']
 
-    'statusCode': response['ResponseMetadata']['HTTPStatusCode'],
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'similarity': similarity})
+        }
 
-    'body': similarity
-
-  }
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
