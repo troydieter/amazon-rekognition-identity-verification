@@ -20,7 +20,7 @@ class IdPlusSelfieStack(Stack):
             "IpsHandler",
             code=_lambda.Code.from_asset("lambda"),
             handler="ips_lambda.lambda_handler",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_12,
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
             },
