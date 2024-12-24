@@ -65,7 +65,10 @@ def lambda_handler(event, context):
 
         return {
             'statusCode': 200,
-            'body': json.dumps({'similarity': similarity})
+            'body': json.dumps({
+                'similarity': similarity,
+                'message': f"The face matched with a {similarity:.2f}% confidence rate"
+            })
         }
 
     except KeyError as e:
