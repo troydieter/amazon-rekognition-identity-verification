@@ -1,4 +1,5 @@
 from aws_cdk import (
+    Duration,
     Stack,
     aws_lambda as _lambda,
     aws_iam as iam,
@@ -21,6 +22,8 @@ class IdPlusSelfieStack(Stack):
             code=_lambda.Code.from_asset("lambda"),
             handler="ips_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(6),
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
             },
