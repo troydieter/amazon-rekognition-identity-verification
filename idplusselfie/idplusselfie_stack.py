@@ -64,23 +64,6 @@ class IdPlusSelfieStack(Stack):
         # Attach the policy to the user
         upload_user.add_to_principal_policy(user_policy)
 
-        # Add a bucket policy specific to the UploadUser
-        bucket.add_to_resource_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "s3:ListBucket",
-                    "s3:GetObject",
-                    "s3:PutObject"
-                ],
-                resources=[
-                    bucket.bucket_arn,
-                    f"{bucket.bucket_arn}/*"
-                ],
-                principals=[upload_user]
-            )
-        )
-
         # Define the Lambda function
         ips_lambda = _lambda.Function(
             self,
