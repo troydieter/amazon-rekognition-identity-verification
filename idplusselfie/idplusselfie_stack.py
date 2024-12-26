@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_logs as logs,
     aws_s3 as s3,
+    aws_s3_notifications as s3_notifications,
     RemovalPolicy,
     CfnOutput
 )
@@ -19,7 +20,7 @@ class IdPlusSelfieStack(Stack):
 
         # Create the S3 bucket
         bucket = s3.Bucket(
-            self, "PublicBucket",
+            self, "UploadBucket",
             bucket_name=None,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
@@ -62,6 +63,23 @@ class IdPlusSelfieStack(Stack):
 
         # Attach the policy to the user
         upload_user.add_to_principal_policy(user_policy)
+
+        # Add a bucket policy specific to the UploadUser
+        bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                    "s3:PutObject"
+                ],
+                resources=[
+                    bucket.bucket_arn,
+                    f"{bucket.bucket_arn}/*"
+                ],
+                principals=[upload_user]
+            )
+        )
 
         # Define the Lambda function
         ips_lambda = _lambda.Function(
@@ -142,6 +160,13 @@ class IdPlusSelfieStack(Stack):
         # Define API Gateway resource and method
         ips_resource = api.root.add_resource("ips")
         ips_resource.add_method("POST", api_key_required=True)  # POST /ips
+
+        # S3 Event notification
+        bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED_PUT,
+            s3_notifications.LambdaDestination(ips_lambda)
+        )
+        bucket.grant_read(ips_lambda)
 
         # Outputs to assist debugging and deployment
         self.output_cfn_info(api, api_key, bucket, upload_user)
