@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_iam as iam,
     aws_apigateway as apigateway,
     aws_logs as logs,
+    aws_s3 as s3,
+    RemovalPolicy,
     CfnOutput
 )
 from constructs import Construct
@@ -14,6 +16,52 @@ class IdPlusSelfieStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Create the S3 bucket
+        bucket = s3.Bucket(
+            self, "PublicBucket",
+            bucket_name=None,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            versioned=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True
+        )
+
+        # Add CORS configuration
+        bucket.add_cors_rule(
+            allowed_methods=[
+                s3.HttpMethods.PUT,
+                s3.HttpMethods.POST,
+                s3.HttpMethods.DELETE,
+                s3.HttpMethods.GET,
+                s3.HttpMethods.HEAD,
+            ],
+            allowed_origins=["*"],
+            allowed_headers=["*"],
+            max_age=3000
+        )
+
+        # Create IAM user
+        upload_user = iam.User(self, "BucketUploadUser")
+
+        # Create IAM policy for the user
+        user_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "s3:ListBucket",
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            resources=[
+                bucket.bucket_arn,
+                f"{bucket.bucket_arn}/*"
+            ]
+        )
+
+        # Attach the policy to the user
+        upload_user.add_to_principal_policy(user_policy)
 
         # Define the Lambda function
         ips_lambda = _lambda.Function(
@@ -96,9 +144,9 @@ class IdPlusSelfieStack(Stack):
         ips_resource.add_method("POST", api_key_required=True)  # POST /ips
 
         # Outputs to assist debugging and deployment
-        self.output_api_url(api, api_key)
+        self.output_cfn_info(api, api_key, bucket, upload_user)
 
-    def output_api_url(self, api: apigateway.RestApi, api_key: apigateway.IApiKey):
+    def output_cfn_info(self, api: apigateway.RestApi, api_key: apigateway.IApiKey, bucket, upload_user):
         CfnOutput(
             self,
             "ApiUrl",
@@ -107,3 +155,5 @@ class IdPlusSelfieStack(Stack):
         )
         # Output the API key (for demonstration purposes)
         CfnOutput(self, "ApiKey", value=api_key.key_id, description="API Key ID")
+        CfnOutput(self, "BucketName", value=bucket.bucket_name, description="The name of the generated bucket")
+        CfnOutput(self, "UserName", value=upload_user.user_name, description="The name of the IAM user")
