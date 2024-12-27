@@ -144,12 +144,16 @@ class IdPlusSelfieStack(Stack):
         ips_resource = api.root.add_resource("ips")
         ips_resource.add_method("POST", api_key_required=True)  # POST /ips
 
-        # S3 Event notification
-        bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED_PUT,
-            s3_notifications.LambdaDestination(ips_lambda)
-        )
-        bucket.grant_read(ips_lambda)
+        ###
+        # Commenting out the below until I add a pre-processing Lambda function
+        ###
+        #
+        # # S3 Event notification
+        # bucket.add_event_notification(
+        #     s3.EventType.OBJECT_CREATED_PUT,
+        #     s3_notifications.LambdaDestination(ips_lambda)
+        # )
+        # bucket.grant_read(ips_lambda)
 
         # Outputs to assist debugging and deployment
         self.output_cfn_info(api, api_key, bucket, upload_user)
