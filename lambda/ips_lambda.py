@@ -1,57 +1,51 @@
 import boto3
-import json
-import base64
 import logging
 import os
+import json
+
+# Initialize S3 and Rekognition clients
+s3_client = boto3.client('s3')
+rekognition_client = boto3.client('rekognition')
 
 def lambda_handler(event, context):
     # Set up logging
     logger = logging.getLogger()
     logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
-    # Log the event structure without the body content
-    safe_event = {k: v if k != 'body' else '<<BODY_CONTENT_HIDDEN>>' for k, v in event.items()}
-    logger.info(f"Received event structure: {json.dumps(safe_event)}")
-
-    client = boto3.client('rekognition')
-
     try:
-        # Ensure we're working with a dictionary
-        if isinstance(event.get('body'), str):
-            payload_dict = json.loads(event['body'])
-        elif isinstance(event.get('body'), dict):
-            payload_dict = event['body']
-        else:
-            raise ValueError("Event body is neither a string nor a dictionary")
+        # Log the event structure
+        logger.info(f"Received event: {json.dumps(event)}")
 
-        # Ensure payload_dict is a dictionary
-        if not isinstance(payload_dict, dict):
-            payload_dict = json.loads(payload_dict)
+        # Parse the S3 event
+        record = event['Records'][0]
+        bucket_name = record['s3']['bucket']['name']
+        selfie_key = record['s3']['object']['key']
 
-        # Log the keys in the payload, not the values
-        logger.info(f"Payload keys: {list(payload_dict.keys())}")
+        logger.info(f"Selfie uploaded: {selfie_key} in bucket {bucket_name}")
 
-        selfie = payload_dict['selfie']
-        dl = payload_dict['dl']
+        # Determine driver's license file key (e.g., replace "_selfie.jpg" with "_dl.jpg")
+        if not selfie_key.endswith("_selfie.jpg"):
+            raise ValueError("Selfie file key does not match expected naming convention")
 
-        # Log only the lengths of selfie and dl
-        logger.info(f"Selfie data length: {len(selfie)}")
-        logger.info(f"DL data length: {len(dl)}")
+        dl_key = selfie_key.replace("_selfie.jpg", "_dl.jpg")
+        logger.info(f"Expected driver's license key: {dl_key}")
 
-        # Convert base64 to bytes
-        s_bytes = base64.b64decode(dl)
-        t_bytes = base64.b64decode(selfie)
+        # Fetch files from S3
+        selfie_file = s3_client.get_object(Bucket=bucket_name, Key=selfie_key)['Body'].read()
+        dl_file = s3_client.get_object(Bucket=bucket_name, Key=dl_key)['Body'].read()
 
+        logger.info("Fetched driver's license and selfie files from S3")
+
+        # Call Rekognition CompareFaces API
         logger.info("Calling Rekognition CompareFaces API")
-        response = client.compare_faces(
+        response = rekognition_client.compare_faces(
             SimilarityThreshold=80,
-            SourceImage={'Bytes': s_bytes},
-            TargetImage={'Bytes': t_bytes}
+            SourceImage={'Bytes': dl_file},
+            TargetImage={'Bytes': selfie_file}
         )
 
-        # Log the Rekognition response (excluding the image data)
-        safe_response = {k: v for k, v in response.items() if k not in ['SourceImageFace', 'TargetImageFace']}
-        logger.info(f"Rekognition response: {json.dumps(safe_response)}")
+        # Log and process the Rekognition response
+        logger.info(f"Rekognition response: {json.dumps(response)}")
 
         if not response['FaceMatches']:
             logger.info("No face matches found")
@@ -61,7 +55,7 @@ def lambda_handler(event, context):
             }
 
         similarity = response['FaceMatches'][0]['Similarity']
-        logger.info(f"Face match found with similarity: {similarity}")
+        logger.info(f"The face matched with a {similarity:.2f}% confidence rate")
 
         return {
             'statusCode': 200,
@@ -71,17 +65,11 @@ def lambda_handler(event, context):
             })
         }
 
-    except KeyError as e:
-        logger.error(f"KeyError: {str(e)}. This might indicate missing data in the payload.")
+    except s3_client.exceptions.NoSuchKey:
+        logger.error(f"Driver's license file not found: {dl_key}")
         return {
-            'statusCode': 400,
-            'body': json.dumps({'error': f"Missing key in payload: {str(e)}"})
-        }
-    except json.JSONDecodeError as e:
-        logger.error(f"JSONDecodeError: {str(e)}. This might indicate malformed JSON in the event body.")
-        return {
-            'statusCode': 400,
-            'body': json.dumps({'error': "Invalid JSON in request body"})
+            'statusCode': 404,
+            'body': json.dumps({'error': f"Driver's license file {dl_key} not found"})
         }
     except ValueError as e:
         logger.error(f"ValueError: {str(e)}")
