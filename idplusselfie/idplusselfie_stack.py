@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_s3 as s3,
     aws_s3_notifications as s3_notifications,
+    aws_dynamodb as dynamodb,
     RemovalPolicy,
     CfnOutput,
 )
@@ -75,6 +76,22 @@ class IdPlusSelfieStack(Stack):
         # Attach the policy to the user
         upload_user.add_to_principal_policy(user_policy)
 
+        # Create DynamoDB table
+        verification_table = dynamodb.Table(
+            self, 'VerificationTable',
+            partition_key=dynamodb.Attribute(
+                name='VerificationId',
+                type=dynamodb.AttributeType.STRING
+            ),            
+            sort_key=dynamodb.Attribute(
+                name='Timestamp',
+                type=dynamodb.AttributeType.NUMBER
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,  # Use RETAIN in production
+            time_to_live_attribute='TTL'
+        )
+
         # Define the Lambda function
         ips_lambda = _lambda.Function(
             self,
@@ -82,13 +99,17 @@ class IdPlusSelfieStack(Stack):
             code=_lambda.Code.from_asset("lambda"),
             handler="ips_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
-            memory_size=128,
+            memory_size=256,
             timeout=Duration.seconds(6),
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "DYNAMODB_TABLE_NAME": verification_table.table_name,
+                "TTL_DAYS": "365"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
+
+        verification_table.grant_read_write_data(ips_lambda)
 
         # Attach an IAM policy for the Lambda function to allow Rekognition actions
         ips_lambda.add_to_role_policy(
@@ -155,9 +176,9 @@ class IdPlusSelfieStack(Stack):
         bucket.grant_read(ips_lambda)
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(bucket, upload_user)
+        self.output_cfn_info(bucket, upload_user, verification_table)
 
-    def output_cfn_info(self, bucket, upload_user):
+    def output_cfn_info(self, bucket, upload_user, verification_table):
         CfnOutput(
             self,
             "BucketName",
@@ -166,4 +187,7 @@ class IdPlusSelfieStack(Stack):
         )
         CfnOutput(
             self, "UserName", value=upload_user.user_name, description="The name of the IAM user"
+        )
+        CfnOutput(
+            self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
