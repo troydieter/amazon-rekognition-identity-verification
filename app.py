@@ -25,4 +25,6 @@ IdPlusSelfieStack(app, "idplusselfieStack",
                   # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
                   )
 
+cdk.Tags.of(app).add("project", "identity-verification")
+
 app.synth()
