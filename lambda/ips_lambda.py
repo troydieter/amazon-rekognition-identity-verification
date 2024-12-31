@@ -4,6 +4,7 @@ import os
 import json
 import uuid
 import datetime
+import base64
 from decimal import Decimal
 
 # Initialize S3, Rekognition, and DynamoDB clients
@@ -16,15 +17,130 @@ TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
 
 TTL_DAYS = int(os.environ.get('TTL_DAYS', 365))  # Default to 365 if not set
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 def lambda_handler(event, context):
-    # Set up logging
-    logger = logging.getLogger()
-    logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-
     try:
-        # Log the event structure
         logger.info(f"Received event: {json.dumps(event)}")
+        
+        # Log specific parts of the event to help identify its structure
+        logger.info(f"Event type: {type(event)}")
+        logger.info(f"Event keys: {list(event.keys())}")
+        
+        if 'body' in event and isinstance(event['body'], dict):
+            logger.info("Identified as API Gateway event with pre-parsed body")
+            return handle_api_request(event['body'])
+        elif 'body' in event and isinstance(event['body'], str):
+            logger.info("Identified as API Gateway event with string body")
+            body = json.loads(event['body'])
+            return handle_api_request(body)
+        elif 'Records' in event and event['Records'][0].get('eventSource') == 'aws:s3':
+            logger.info("Identified as S3 event")
+            return handle_s3_event(event)
+        else:
+            logger.error("Unrecognized event type")
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': "Unrecognized event type"})
+            }
 
+    except Exception as e:
+        logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': "Internal server error"})
+        }
+
+def handle_api_request(body):
+    try:
+        logger.info("Handling API Gateway request")
+        
+        logger.info(f"Parsed body: {json.dumps(body)}")
+        
+        selfie = body['selfie']
+        dl = body['dl']
+
+        # Convert base64 to bytes
+        dl_bytes = base64.b64decode(dl)
+        selfie_bytes = base64.b64decode(selfie)
+
+        # Call Rekognition CompareFaces API
+        logger.info("Calling Rekognition CompareFaces API")
+        response = rekognition_client.compare_faces(
+            SimilarityThreshold=80,
+            SourceImage={'Bytes': dl_bytes},
+            TargetImage={'Bytes': selfie_bytes}
+        )
+
+        # Generate UUID for DynamoDB partition key
+        verification_id = str(uuid.uuid4())
+
+        # Generate current timestamp
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = Decimal(str(current_time.timestamp()))
+        ttl = Decimal(str((current_time + datetime.timedelta(days=TTL_DAYS)).timestamp()))
+
+        if not response['FaceMatches']:
+            logger.info("No face matches found")
+            result = {
+                'similarity': Decimal('0'),
+                'message': 'No face matches found'
+            }
+        else:
+            similarity = Decimal(str(response['FaceMatches'][0]['Similarity']))
+            logger.info(f"The face matched with a {similarity:.2f}% confidence rate")
+            result = {
+                'similarity': similarity,
+                'message': f"The face matched with a {similarity:.2f}% confidence rate"
+            }
+
+        # Write result to DynamoDB
+        table = dynamodb.Table(TABLE_NAME)
+        item = {
+            'VerificationId': verification_id,
+            'Similarity': result['similarity'],
+            'Message': result['message'],
+            'Timestamp': timestamp,
+            'TTL': ttl
+        }
+        table.put_item(Item=item)
+        logger.info(f"Result written to DynamoDB with VerificationId: {verification_id}")
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'verificationId': verification_id,
+                'result': {
+                    'similarity': float(result['similarity']),
+                    'message': result['message'],
+                    'timestamp': current_time.isoformat()
+                }
+            }, default=str)
+        }
+
+    except KeyError as e:
+        logger.error(f"Missing required field: {str(e)}")
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': f"Missing required field: {str(e)}"})
+        }
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in request body: {str(e)}")
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': "Invalid JSON in request body"})
+        }
+    except Exception as e:
+        logger.error(f"Error in API request: {str(e)}", exc_info=True)
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': "Internal server error"})
+        }
+
+
+def handle_s3_event(event):
+    try:
         # Parse the S3 event
         record = event['Records'][0]
         bucket_name = record['s3']['bucket']['name']
@@ -95,8 +211,8 @@ def lambda_handler(event, context):
             item = {
                 'VerificationId': verification_id,
                 'SessionId': session_id,
-                'DriversLicenseKey': dl_key,
-                'SelfieKey': selfie_key,
+                'DriversLicense-S3Object_Key': dl_key,
+                'Selfie-S3Object_Key': selfie_key,
                 'Similarity': result['similarity'],
                 'Message': result['message'],
                 'Timestamp': timestamp,

@@ -7,6 +7,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_s3_notifications as s3_notifications,
     aws_dynamodb as dynamodb,
+    aws_apigateway as apigateway,
     RemovalPolicy,
     CfnOutput,
 )
@@ -120,53 +121,74 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        # Commented-out API Gateway configuration
-        # api = apigateway.LambdaRestApi(
-        #     self,
-        #     "IpsApi",
-        #     handler=ips_lambda,
-        #     proxy=False,
-        # )
-        #
-        # api_key = api.add_api_key("IpsApiKey")
-        #
-        # usage_plan = api.add_usage_plan(
-        #     "IpsUsagePlan",
-        #     name="IPS Usage Plan",
-        #     throttle=apigateway.ThrottleSettings(
-        #         rate_limit=10,
-        #         burst_limit=2,
-        #     ),
-        # )
-        #
-        # usage_plan.add_api_key(api_key)
-        #
-        # usage_plan.add_api_stage(stage=api.deployment_stage)
-        #
-        # log_group = logs.LogGroup(
-        #     self,
-        #     "ApiAccessLogs",
-        #     retention=logs.RetentionDays.ONE_WEEK,
-        # )
-        #
-        # api_stage = api.deployment_stage
-        # api_stage.node.default_child.access_log_settings = apigateway.CfnStage.AccessLogSettingProperty(
-        #     destination_arn=log_group.log_group_arn,
-        #     format=apigateway.AccessLogFormat.json_with_standard_fields(
-        #         caller=True,
-        #         http_method=True,
-        #         ip=True,
-        #         protocol=True,
-        #         request_time=True,
-        #         resource_path=True,
-        #         response_length=True,
-        #         status=True,
-        #         user=True,
-        #     ).to_string(),
-        # )
-        #
-        # ips_resource = api.root.add_resource("ips")
-        # ips_resource.add_method("POST", api_key_required=True)
+        api = apigateway.LambdaRestApi(
+            self,
+            "IpsApi",
+            handler=ips_lambda,
+            proxy=False,
+        )
+
+        api_key = api.add_api_key("IpsApiKey")
+
+        usage_plan = api.add_usage_plan(
+            "IpsUsagePlan",
+            name="IPS Usage Plan",
+            throttle=apigateway.ThrottleSettings(
+                rate_limit=10,
+                burst_limit=2,
+            ),
+        )
+
+        usage_plan.add_api_key(api_key)
+        usage_plan.add_api_stage(stage=api.deployment_stage)
+
+        log_group = logs.LogGroup(
+            self,
+            "ApiAccessLogs",
+            retention=logs.RetentionDays.ONE_WEEK,
+        )
+
+        api_stage = api.deployment_stage
+        api_stage.node.default_child.access_log_settings = apigateway.CfnStage.AccessLogSettingProperty(
+            destination_arn=log_group.log_group_arn,
+            format=apigateway.AccessLogFormat.json_with_standard_fields(
+                caller=True,
+                http_method=True,
+                ip=True,
+                protocol=True,
+                request_time=True,
+                resource_path=True,
+                response_length=True,
+                status=True,
+                user=True,
+            ).to_string(),
+        )
+
+        # Add the new resource and method
+        compare_faces_resource = api.root.add_resource("compare-faces")
+        compare_faces_integration = apigateway.LambdaIntegration(
+            ips_lambda,
+            proxy=False,
+            integration_responses=[
+                apigateway.IntegrationResponse(
+                    status_code="200",
+                    response_templates={"application/json": ""},
+                )
+            ],
+            request_templates={
+                "application/json": '{"body": $input.json("$")}'
+            }
+        )
+
+        compare_faces_method = compare_faces_resource.add_method(
+            "POST",
+            compare_faces_integration,
+            method_responses=[apigateway.MethodResponse(status_code="200")],
+            api_key_required=True,
+        )
+        
+        ips_resource = api.root.add_resource("ips")
+        ips_resource.add_method("POST", api_key_required=True)
 
         # S3 Event notification
         bucket.add_event_notification(
@@ -176,9 +198,9 @@ class IdPlusSelfieStack(Stack):
         bucket.grant_read(ips_lambda)
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(bucket, upload_user, verification_table)
+        self.output_cfn_info(bucket, upload_user, verification_table, api, api_key)
 
-    def output_cfn_info(self, bucket, upload_user, verification_table):
+    def output_cfn_info(self, bucket, upload_user, verification_table, api, api_key):
         CfnOutput(
             self,
             "BucketName",
@@ -190,4 +212,39 @@ class IdPlusSelfieStack(Stack):
         )
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
+        )
+        CfnOutput(self, "ApiUrl",
+            value=api.url,
+            description="URL of the API Gateway",
+            export_name=f"{self.stack_name}-ApiUrl"
+        )
+
+        CfnOutput(self, "ApiEndpoint",
+            value=f"{api.url}compare-faces",
+            description="Endpoint for face comparison",
+            export_name=f"{self.stack_name}-ApiEndpoint"
+        )
+
+        CfnOutput(self, "ApiKeyId",
+            value=api_key.key_id,
+            description="ID of the API Key",
+            export_name=f"{self.stack_name}-ApiKeyId"
+        )
+
+        CfnOutput(self, "ApiName",
+            value=api.rest_api_name,
+            description="Name of the API",
+            export_name=f"{self.stack_name}-ApiName"
+        )
+
+        CfnOutput(self, "ApiId",
+            value=api.rest_api_id,
+            description="ID of the API",
+            export_name=f"{self.stack_name}-ApiId"
+        )
+
+        CfnOutput(self, "ApiStage",
+            value=api.deployment_stage.stage_name,
+            description="Stage of the API",
+            export_name=f"{self.stack_name}-ApiStage"
         )
