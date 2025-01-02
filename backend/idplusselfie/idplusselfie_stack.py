@@ -139,9 +139,6 @@ class IdPlusSelfieStack(Stack):
             ],
             api_key_required=True,
         )
-        
-        # ips_resource = api.root.add_resource("ips")
-        # ips_resource.add_method("POST", api_key_required=True)
 
         # Outputs to assist debugging and deployment
         self.output_cfn_info(verification_table, api, api_key)
