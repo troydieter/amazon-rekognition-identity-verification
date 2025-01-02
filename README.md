@@ -6,18 +6,18 @@ A robust solution for digital identity verification using Amazon Rekognition.
 
 This project provides a serverless API for comparing a user's selfie with their driver's license photo, leveraging the power of Amazon Rekognition for accurate face matching.
 
-![Frontend](front_end.png)
+![Frontend](./backend/Documentation/front_end.png)
 
 #### Confirmation of match:
-![Confirm](confirm_yes.png)
+![Confirm](./backend/Documentation/confirm_yes.png)
 
 #### No match found:
-![Fail](fail_confirmation.png)
+![Fail](./backend/Documentation/fail_confirmation.png)
 
 ## Architecture
 
 ### AWS Solution Architecture
-![Visual AWS Architecture](diagram.png)
+![Visual AWS Architecture](./backend/Documentation/diagram.png)
 1. User uploads files (ID + Selfie) to the system.
 2. Amazon API Gateway receives the POST request at the /prod/ips endpoint.
 3. IAM Role assumes the necessary permissions for the Lambda function.
