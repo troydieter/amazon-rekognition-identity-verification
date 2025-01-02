@@ -32,12 +32,12 @@ class IdPlusSelfieStack(Stack):
             time_to_live_attribute='TTL'
         )
 
-        # Define the Lambda function
-        ips_lambda = _lambda.Function(
+        # Define the Lambda functions
+        id_create_lambda = _lambda.Function(
             self,
             "IpsHandler",
             code=_lambda.Code.from_asset("lambda"),
-            handler="ips_lambda.lambda_handler",
+            handler="id_create_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             memory_size=256,
             timeout=Duration.seconds(6),
@@ -49,10 +49,27 @@ class IdPlusSelfieStack(Stack):
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
 
-        verification_table.grant_read_write_data(ips_lambda)
+        id_delete_lambda = _lambda.Function(
+            self,
+            "IpsHandlerDelete",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_delete_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(6),
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "DYNAMODB_TABLE_NAME": verification_table.table_name,
+                "TTL_DAYS": "365"
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        verification_table.grant_read_write_data(id_create_lambda)
+        verification_table.grant_read_write_data(id_delete_lambda)
 
         # Attach an IAM policy for the Lambda function to allow Rekognition actions
-        ips_lambda.add_to_role_policy(
+        id_create_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["rekognition:CompareFaces"],
@@ -60,14 +77,12 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        api = apigateway.LambdaRestApi(
+        api = apigateway.RestApi(
             self,
             "CompareApi",
-            handler=ips_lambda,
-            proxy=False,
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=['http://localhost:3000'],
-                allow_methods=['POST', 'OPTIONS'],
+                allow_methods=['POST', 'DELETE', 'OPTIONS'],
                 allow_headers=['Content-Type', 'X-Api-Key']
             )
         )
@@ -108,10 +123,10 @@ class IdPlusSelfieStack(Stack):
             ).to_string(),
         )
 
-        # Add the new resource and method
-        compare_faces_resource = api.root.add_resource("compare-faces")
-        compare_faces_integration = apigateway.LambdaIntegration(
-            ips_lambda,
+        # Compare Faces - Create
+        compare_faces_resource_create = api.root.add_resource("compare-faces")
+        compare_faces_integration_create = apigateway.LambdaIntegration(
+            id_create_lambda,
             proxy=False,
             integration_responses=[
                 apigateway.IntegrationResponse(
@@ -126,14 +141,67 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
-        compare_faces_method = compare_faces_resource.add_method(
+        compare_faces_resource_create.add_method(
             "POST",
-            compare_faces_integration,
+            compare_faces_integration_create,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",
                     response_parameters={
                         'method.response.header.Access-Control-Allow-Origin': True
+                    }
+                )
+            ],
+            api_key_required=True,
+        )
+
+        # Compare Faces - Delete
+        compare_faces_resource_delete = api.root.add_resource("compare-faces-delete")
+        compare_faces_integration_delete = apigateway.LambdaIntegration(
+            id_delete_lambda,
+            proxy=False,
+            integration_responses=[
+                apigateway.IntegrationResponse(
+                    status_code="200",
+                    response_parameters={
+                        'method.response.header.Access-Control-Allow-Origin': "'http://localhost:3000'",
+                        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Api-Key'",
+                        'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,DELETE'"
+                    }
+                )
+            ],
+            request_templates={
+                "application/json": """
+                #set($inputRoot = $input.path('$'))
+                {
+                    "body": $input.json('$'),
+                    "queryStringParameters": {
+                        #foreach($param in $input.params().querystring.keySet())
+                            "$param": "$util.escapeJavaScript($input.params().querystring.get($param))"
+                            #if($foreach.hasNext),#end
+                        #end
+                    },
+                    "headers": {
+                        #foreach($param in $input.params().header.keySet())
+                            "$param": "$util.escapeJavaScript($input.params().header.get($param))"
+                            #if($foreach.hasNext),#end
+                        #end
+                    }
+                }
+                """
+            }
+        )
+
+        compare_faces_resource_delete.add_method(
+            "DELETE",
+            compare_faces_integration_delete,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        'method.response.header.Access-Control-Allow-Origin': True,
+                        'method.response.header.Access-Control-Allow-Headers': True,
+                        'method.response.header.Access-Control-Allow-Methods': True
                     }
                 )
             ],

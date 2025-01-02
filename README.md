@@ -19,7 +19,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 ### AWS Solution Architecture
 ![Visual AWS Architecture](./backend/docs/diagram.png)
 1. User uploads files (ID + Selfie) to the system.
-2. Amazon API Gateway receives the POST request at the `/prod/compare-faces` endpoint.
+2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
 3. IAM Role assumes the necessary permissions for the Lambda function.
 4. CloudWatch Logs record the Lambda function's execution details.
 5. The AWS Lambda function uses the AWS SDK to interact with Amazon Rekognition.
@@ -94,12 +94,85 @@ Before you begin, ensure you have the following installed:
    cdk destroy
    ```
 
-## Good to Know
+# API Documentation
 
-- **AWS CDK**: Allows you to define cloud infrastructure in code and provision it through AWS CloudFormation.
-- **Amazon Rekognition**: Provides pre-trained and customizable computer vision (CV) capabilities to extract information and insights from your images and videos.
-- **API Gateway**: Manages the REST API, handling request/response cycles and integrating with Lambda.
-- **Lambda**: Runs your code in response to events and automatically manages the underlying compute resources.
+## Endpoints
+
+### Compare Faces
+
+Create a new face comparison.
+
+- URL: `/compare-faces`
+- Method: `POST`
+- Auth: API Key required
+- Content-Type: `application/json`
+
+Request Body:
+```
+{
+  "selfie": "base64_encoded_selfie_image",
+  "dl": "base64_encoded_drivers_license_image"
+}
+```
+
+Response:
+```
+{
+  "verificationId": "string",
+  "result": {
+    "similarity": "number",
+    "message": "string",
+    "timestamp": "string (ISO 8601 format)"
+  }
+}
+```
+
+### Delete Comparison
+
+Delete an existing face comparison.
+
+- URL: `/compare-faces-delete`
+- Method: `DELETE`
+- Auth: API Key required
+- Query Parameters:
+  - `verificationId`: string (required)
+
+Response:
+```
+{
+  "message": "string"
+}
+```
+
+## Authentication
+
+All endpoints require an API key to be included in the request headers:
+
+`X-Api-Key: your_api_key_here`
+
+## CORS
+
+CORS is enabled for `http://localhost:3000` with the following configurations:
+- Allowed Methods: `POST`, `DELETE`, `OPTIONS`
+- Allowed Headers: `Content-Type`, `X-Api-Key`
+
+## Rate Limiting
+
+The API is subject to the following rate limits:
+- Rate limit: 10 requests per second
+- Burst limit: 2 requests
+
+## Error Responses
+
+The API uses standard HTTP response codes to indicate the success or failure of requests. In case of errors, additional information may be provided in the response body.
+
+Common error codes:
+- 400: Bad Request
+- 401: Unauthorized
+- 403: Forbidden
+- 404: Not Found
+- 429: Too Many Requests
+- 500: Internal Server Error
 
 ## Clean Up
 
