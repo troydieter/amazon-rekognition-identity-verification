@@ -4,8 +4,6 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_iam as iam,
     aws_logs as logs,
-    aws_s3 as s3,
-    aws_s3_notifications as s3_notifications,
     aws_dynamodb as dynamodb,
     aws_apigateway as apigateway,
     RemovalPolicy,
@@ -17,65 +15,6 @@ class IdPlusSelfieStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        # Create the S3 bucket
-        bucket = s3.Bucket(
-            self,
-            "UploadBucket",
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-            enforce_ssl=True,
-            versioned=True,
-            removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True,
-            # Lifecycle Rule
-            # 91 days in Amazon S3 Standard until Amazon S3 Glacier+
-            # Expire after 1yr
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    transitions=[
-                        s3.Transition(
-                            storage_class=s3.StorageClass.GLACIER,
-                            transition_after=Duration.days(91)  # Transition after 91 days
-                        )
-                    ],
-                    expiration=Duration.days(365)  # Expire after 365 days
-                )
-            ]
-        )
-        # Add CORS configuration
-        bucket.add_cors_rule(
-            allowed_methods=[
-                s3.HttpMethods.PUT,
-                s3.HttpMethods.POST,
-                s3.HttpMethods.DELETE,
-                s3.HttpMethods.GET,
-                s3.HttpMethods.HEAD,
-            ],
-            allowed_origins=["*"],
-            allowed_headers=["*"],
-            max_age=3000,
-        )
-
-        # Create IAM user
-        upload_user = iam.User(self, "BucketUploadUser")
-
-        # Create IAM policy for the user
-        user_policy = iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=[
-                "s3:ListBucket",
-                "s3:GetObject",
-                "s3:PutObject",
-            ],
-            resources=[
-                bucket.bucket_arn,
-                f"{bucket.bucket_arn}/*",
-            ],
-        )
-
-        # Attach the policy to the user
-        upload_user.add_to_principal_policy(user_policy)
 
         # Create DynamoDB table
         verification_table = dynamodb.Table(
@@ -123,9 +62,14 @@ class IdPlusSelfieStack(Stack):
 
         api = apigateway.LambdaRestApi(
             self,
-            "IpsApi",
+            "CompareApi",
             handler=ips_lambda,
             proxy=False,
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=['http://localhost:3000'],
+                allow_methods=['POST', 'OPTIONS'],
+                allow_headers=['Content-Type', 'X-Api-Key']
+            )
         )
 
         api_key = api.add_api_key("IpsApiKey")
@@ -172,7 +116,9 @@ class IdPlusSelfieStack(Stack):
             integration_responses=[
                 apigateway.IntegrationResponse(
                     status_code="200",
-                    response_templates={"application/json": ""},
+                    response_parameters={
+                        'method.response.header.Access-Control-Allow-Origin': "'http://localhost:3000'"
+                    }
                 )
             ],
             request_templates={
@@ -183,33 +129,24 @@ class IdPlusSelfieStack(Stack):
         compare_faces_method = compare_faces_resource.add_method(
             "POST",
             compare_faces_integration,
-            method_responses=[apigateway.MethodResponse(status_code="200")],
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        'method.response.header.Access-Control-Allow-Origin': True
+                    }
+                )
+            ],
             api_key_required=True,
         )
         
-        ips_resource = api.root.add_resource("ips")
-        ips_resource.add_method("POST", api_key_required=True)
-
-        # S3 Event notification
-        bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED_PUT,
-            s3_notifications.LambdaDestination(ips_lambda),
-        )
-        bucket.grant_read(ips_lambda)
+        # ips_resource = api.root.add_resource("ips")
+        # ips_resource.add_method("POST", api_key_required=True)
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(bucket, upload_user, verification_table, api, api_key)
+        self.output_cfn_info(verification_table, api, api_key)
 
-    def output_cfn_info(self, bucket, upload_user, verification_table, api, api_key):
-        CfnOutput(
-            self,
-            "BucketName",
-            value=bucket.bucket_name,
-            description="The name of the generated bucket",
-        )
-        CfnOutput(
-            self, "UserName", value=upload_user.user_name, description="The name of the IAM user"
-        )
+    def output_cfn_info(self, verification_table, api, api_key):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
