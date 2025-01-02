@@ -19,7 +19,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 ### AWS Solution Architecture
 ![Visual AWS Architecture](./backend/docs/diagram.png)
 1. User uploads files (ID + Selfie) to the system.
-2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
+2. Amazon API Gateway receives the POST request at the `/prod/compare-faces` endpoint.
 3. IAM Role assumes the necessary permissions for the Lambda function.
 4. CloudWatch Logs record the Lambda function's execution details.
 5. The AWS Lambda function uses the AWS SDK to interact with Amazon Rekognition.
