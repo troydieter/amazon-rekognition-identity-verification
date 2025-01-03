@@ -92,7 +92,7 @@ def cors_response(status_code, body):
     return {
         'statusCode': status_code,
         'headers': {
-            'Access-Control-Allow-Origin': 'http://localhost:3000',
+            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type,X-Api-Key',
             'Access-Control-Allow-Methods': 'DELETE,OPTIONS'
         },

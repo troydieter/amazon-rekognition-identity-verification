@@ -150,12 +150,6 @@ All endpoints require an API key to be included in the request headers:
 
 `X-Api-Key: your_api_key_here`
 
-## CORS
-
-CORS is enabled for `http://localhost:3000` with the following configurations:
-- Allowed Methods: `POST`, `DELETE`, `OPTIONS`
-- Allowed Headers: `Content-Type`, `X-Api-Key`
-
 ## Rate Limiting
 
 The API is subject to the following rate limits:

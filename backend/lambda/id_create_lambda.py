@@ -36,7 +36,7 @@ def lambda_handler(event, context):
                 return {
                     'statusCode': 200,
                     'headers': {
-                        'Access-Control-Allow-Origin': 'http://localhost:3000',
+                        'Access-Control-Allow-Origin': '*',
                         'Access-Control-Allow-Headers': 'Content-Type,X-Api-Key',
                         'Access-Control-Allow-Methods': 'POST,OPTIONS'
                     },
@@ -78,6 +78,11 @@ def handle_api_request(body):
         selfie = body.get('selfie')
         dl = body.get('dl')
 
+        # Generate current timestamp
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = Decimal(str(current_time.timestamp()))
+        ttl = Decimal(str((current_time + datetime.timedelta(days=TTL_DAYS)).timestamp()))
+
         if not selfie or not dl:
             raise KeyError('Missing selfie or dl in the request body')
 
@@ -108,11 +113,6 @@ def handle_api_request(body):
             SourceImage={'Bytes': dl_bytes},
             TargetImage={'Bytes': selfie_bytes}
         )
-
-        # Generate current timestamp
-        current_time = datetime.datetime.now(datetime.timezone.utc)
-        timestamp = Decimal(str(current_time.timestamp()))
-        ttl = Decimal(str((current_time + datetime.timedelta(days=TTL_DAYS)).timestamp()))
 
         if not response['FaceMatches']:
             logger.info("No face matches found")
@@ -168,8 +168,8 @@ def cors_response(status_code, body):
     return {
         'statusCode': status_code,
         'headers': {
-            'Access-Control-Allow-Origin': 'http://localhost:3000',
-            'Access-Control-Allow-Headers': 'Content-Type,X-Api-Key',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type,X-Api-Key,Authorization',
             'Access-Control-Allow-Methods': 'POST,OPTIONS',
             'Access-Control-Allow-Credentials': 'true'
         },

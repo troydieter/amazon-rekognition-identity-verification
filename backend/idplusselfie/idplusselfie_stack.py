@@ -98,7 +98,7 @@ class IdPlusSelfieStack(Stack):
             self,
             "CompareApi",
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=['http://localhost:3000'],
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=['Content-Type', 'X-Api-Key'],
                 allow_credentials=True
@@ -150,7 +150,7 @@ class IdPlusSelfieStack(Stack):
                 apigateway.IntegrationResponse(
                     status_code="200",
                     response_parameters={
-                        'method.response.header.Access-Control-Allow-Origin': "'http://localhost:3000'"
+                        'method.response.header.Access-Control-Allow-Origin': "'*'"
                     }
                 )
             ],
@@ -182,9 +182,10 @@ class IdPlusSelfieStack(Stack):
                 apigateway.IntegrationResponse(
                     status_code="200",
                     response_parameters={
-                        'method.response.header.Access-Control-Allow-Origin': "'http://localhost:3000'",
+                        'method.response.header.Access-Control-Allow-Origin': "'*'",
                         'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Api-Key'",
-                        'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,DELETE'"
+                        'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,DELETE'",
+                        'method.response.header.Access-Control-Allow-Credentials': "'true'"
                     }
                 )
             ],
@@ -219,7 +220,8 @@ class IdPlusSelfieStack(Stack):
                     response_parameters={
                         'method.response.header.Access-Control-Allow-Origin': True,
                         'method.response.header.Access-Control-Allow-Headers': True,
-                        'method.response.header.Access-Control-Allow-Methods': True
+                        'method.response.header.Access-Control-Allow-Methods': True,
+                        'method.response.header.Access-Control-Allow-Credentials': True
                     }
                 )
             ],
