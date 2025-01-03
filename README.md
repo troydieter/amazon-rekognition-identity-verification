@@ -17,14 +17,23 @@ This project provides a serverless API for comparing a user's selfie with their 
 ## Architecture
 
 ### AWS Solution Architecture
-![Visual AWS Architecture](./backend/docs/diagram.png)
+#### /compare-faces
+![Visual AWS Architecture](./backend/docs/diagram01.png)
 1. User uploads files (ID + Selfie) to the system.
 2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
 3. IAM Role assumes the necessary permissions for the Lambda function.
 4. CloudWatch Logs record the Lambda function's execution details.
 5. The AWS Lambda function uses the AWS SDK to interact with Amazon Rekognition.
-6. The Rekognition response is stored in a DynamoDB table with the `VerificationId` attribute in the item. (see: the purple purple box)
+6. The Rekognition response is stored in a DynamoDB table with the `VerificationId` attribute in the item. The object is also stored in Amazon S3 for post-processing. (see: the purple boxes shown to the right)
 7. Amazon Rekognition processes the images and returns a response (box at the bottom).
+
+#### /compare-faces-delete
+![Visual AWS Architecture](./backend/docs/diagram02.png)
+1. Admin user receives a request to delete an identity that has been verified. They retrieve the `VerificationId` value as initially registered by the user.
+2. A `DELETE` API call is made to API Gateway with `VerificationId` as a parameter and the necessary `x-api-key` value in the header.
+3. IAM Role assumes the necessary permissions for the Lambda function.
+4. CloudWatch Logs record the Lambda function's execution details.
+5. The item in the DynamoDB table, based on the primary key `VerificationId` is deleted along with the Amazon S3 objects (one of each). The response is sent back via the API call that it has been deleted successfully.
 
 ## Deployment - Backend
 
