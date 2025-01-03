@@ -90,10 +90,13 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 "DYNAMODB_TABLE_NAME": verification_table.table_name,
+                "S3_BUCKET_NAME": bucket.bucket_name,
                 "TTL_DAYS": "365"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
+
+        bucket.grant_read_write(id_delete_lambda)
 
         verification_table.grant_read_write_data(id_create_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
