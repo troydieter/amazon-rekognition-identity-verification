@@ -12,6 +12,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+
 class IdPlusSelfieStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -26,9 +27,21 @@ class IdPlusSelfieStack(Stack):
             enforce_ssl=True,
             versioned=True,
             removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True
+            auto_delete_objects=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    transitions=[
+                        s3.Transition(
+                            storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                            # Move to Intelligent-Tiering after 30 days
+                            transition_after=Duration.days(30)
+                        )
+                    ],
+                    # Delete objects after 1 year
+                    expiration=Duration.days(365)
+                )
+            ]
         )
-
 
         # Create DynamoDB table
         verification_table = dynamodb.Table(
@@ -36,7 +49,7 @@ class IdPlusSelfieStack(Stack):
             partition_key=dynamodb.Attribute(
                 name='VerificationId',
                 type=dynamodb.AttributeType.STRING
-            ),            
+            ),
             sort_key=dynamodb.Attribute(
                 name='Timestamp',
                 type=dynamodb.AttributeType.NUMBER
@@ -90,7 +103,8 @@ class IdPlusSelfieStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["rekognition:CompareFaces"],
-                resources=["*"],  # Limit this further if possible for better security
+                # Limit this further if possible for better security
+                resources=["*"],
             )
         )
 
@@ -174,7 +188,8 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Compare Faces - Delete
-        compare_faces_resource_delete = api.root.add_resource("compare-faces-delete")
+        compare_faces_resource_delete = api.root.add_resource(
+            "compare-faces-delete")
         compare_faces_integration_delete = apigateway.LambdaIntegration(
             id_delete_lambda,
             proxy=False,
@@ -236,38 +251,39 @@ class IdPlusSelfieStack(Stack):
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
         CfnOutput(self, "ApiUrl",
-            value=api.url,
-            description="URL of the API Gateway",
-            export_name=f"{self.stack_name}-ApiUrl"
-        )
+                  value=api.url,
+                  description="URL of the API Gateway",
+                  export_name=f"{self.stack_name}-ApiUrl"
+                  )
 
         CfnOutput(self, "ApiEndpoint",
-            value=f"{api.url}compare-faces",
-            description="Endpoint for face comparison",
-            export_name=f"{self.stack_name}-ApiEndpoint"
-        )
+                  value=f"{api.url}compare-faces",
+                  description="Endpoint for face comparison",
+                  export_name=f"{self.stack_name}-ApiEndpoint"
+                  )
 
         CfnOutput(self, "ApiKeyId",
-            value=api_key.key_id,
-            description="ID of the API Key",
-            export_name=f"{self.stack_name}-ApiKeyId"
-        )
+                  value=api_key.key_id,
+                  description="ID of the API Key",
+                  export_name=f"{self.stack_name}-ApiKeyId"
+                  )
 
         CfnOutput(self, "ApiName",
-            value=api.rest_api_name,
-            description="Name of the API",
-            export_name=f"{self.stack_name}-ApiName"
-        )
+                  value=api.rest_api_name,
+                  description="Name of the API",
+                  export_name=f"{self.stack_name}-ApiName"
+                  )
 
         CfnOutput(self, "ApiId",
-            value=api.rest_api_id,
-            description="ID of the API",
-            export_name=f"{self.stack_name}-ApiId"
-        )
+                  value=api.rest_api_id,
+                  description="ID of the API",
+                  export_name=f"{self.stack_name}-ApiId"
+                  )
 
         CfnOutput(self, "ApiStage",
-            value=api.deployment_stage.stage_name,
-            description="Stage of the API",
-            export_name=f"{self.stack_name}-ApiStage"
-        )
-        CfnOutput(self, "BucketName", value=bucket.bucket_name, description="The name of the generated bucket")
+                  value=api.deployment_stage.stage_name,
+                  description="Stage of the API",
+                  export_name=f"{self.stack_name}-ApiStage"
+                  )
+        CfnOutput(self, "BucketName", value=bucket.bucket_name,
+                  description="The name of the generated bucket")

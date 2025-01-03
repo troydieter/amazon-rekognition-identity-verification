@@ -21,16 +21,17 @@ TTL_DAYS = int(os.environ.get('TTL_DAYS', 365))  # Default to 365 if not set
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def lambda_handler(event, context):
     try:
         # Log only non-sensitive parts of the event
         safe_event = {k: v for k, v in event.items() if k != 'body'}
         logger.info(f"Received event: {json.dumps(safe_event)}")
-        
+
         # Check if it's an API Gateway event
         if 'requestContext' in event and 'http' in event['requestContext']:
             http_method = event['requestContext']['http']['method']
-            
+
             # Handle CORS preflight request
             if http_method == 'OPTIONS':
                 return {
@@ -42,46 +43,51 @@ def lambda_handler(event, context):
                     },
                     'body': ''
                 }
-            
+
             # Handle POST request
             if http_method == 'POST':
                 if 'body' in event:
-                    body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
+                    body = json.loads(event['body']) if isinstance(
+                        event['body'], str) else event['body']
                     return handle_api_request(body)
                 else:
                     logger.error("Missing body in POST request")
                     return cors_response(400, {'error': "Missing body in POST request"})
-            
+
             logger.error(f"Unsupported HTTP method: {http_method}")
             return cors_response(405, {'error': "Method not allowed"})
-        
+
         # If it's not an API Gateway event, assume it's a direct invocation
         elif 'body' in event:
-            body = event['body'] if isinstance(event['body'], dict) else json.loads(event['body'])
+            body = event['body'] if isinstance(
+                event['body'], dict) else json.loads(event['body'])
             return handle_api_request(body)
-        
+
         else:
             logger.error("Unrecognized event structure")
             return cors_response(400, {'error': "Unrecognized event structure"})
 
     except Exception as e:
-        logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error in lambda_handler: {
+                     str(e)}", exc_info=True)
         return cors_response(500, {'error': "Internal server error"})
+
 
 def handle_api_request(body):
     try:
         logger.info("Handling API Gateway request")
-        
+
         # Log only the keys present in the body, not the values
         logger.info(f"Received body keys: {list(body.keys())}")
-        
+
         selfie = body.get('selfie')
         dl = body.get('dl')
 
         # Generate current timestamp
         current_time = datetime.datetime.now(datetime.timezone.utc)
         timestamp = Decimal(str(current_time.timestamp()))
-        ttl = Decimal(str((current_time + datetime.timedelta(days=TTL_DAYS)).timestamp()))
+        ttl = Decimal(
+            str((current_time + datetime.timedelta(days=TTL_DAYS)).timestamp()))
 
         if not selfie or not dl:
             raise KeyError('Missing selfie or dl in the request body')
@@ -102,7 +108,8 @@ def handle_api_request(body):
         selfie_key = f"selfie/{verification_id}.jpg"
 
         s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=dl_key, Body=dl_bytes)
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=selfie_key, Body=selfie_bytes)
+        s3_client.put_object(Bucket=S3_BUCKET_NAME,
+                             Key=selfie_key, Body=selfie_bytes)
 
         logger.info(f"Files uploaded to S3: {dl_key}, {selfie_key}")
 
@@ -123,7 +130,8 @@ def handle_api_request(body):
             }
         else:
             similarity = Decimal(str(response['FaceMatches'][0]['Similarity']))
-            logger.info(f"The face matched with a {similarity}% confidence rate")
+            logger.info(f"The face matched with a {
+                        similarity}% confidence rate")
             result = {
                 'verificationId': verification_id,
                 'similarity': similarity,
@@ -142,7 +150,8 @@ def handle_api_request(body):
             'SelfieImageS3Key': selfie_key
         }
         table.put_item(Item=item)
-        logger.info(f"Result written to DynamoDB with VerificationId: {verification_id}")
+        logger.info(f"Result written to DynamoDB with VerificationId: {
+                    verification_id}")
 
         return cors_response(200, {
             'verificationId': verification_id,

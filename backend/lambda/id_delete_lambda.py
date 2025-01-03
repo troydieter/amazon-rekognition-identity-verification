@@ -12,13 +12,15 @@ TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def lambda_handler(event, context):
     logger.info(f"Received event: {json.dumps(event)}")
-    
+
     try:
         # Extract verificationId from query parameters
-        verification_id = event.get('queryStringParameters', {}).get('verificationId')
-        
+        verification_id = event.get(
+            'queryStringParameters', {}).get('verificationId')
+
         if not verification_id:
             logger.error("Missing verificationId in the request")
             return {
@@ -37,7 +39,8 @@ def lambda_handler(event, context):
 
         items = response.get('Items', [])
         if not items:
-            logger.error(f"No item found with VerificationId: {verification_id}")
+            logger.error(f"No item found with VerificationId: {
+                         verification_id}")
             return {
                 'statusCode': 404,
                 'body': json.dumps({'error': f"No item found with VerificationId: {verification_id}"})
@@ -54,8 +57,9 @@ def lambda_handler(event, context):
                 'Timestamp': timestamp
             }
         )
-        
-        logger.info(f"Item with VerificationId {verification_id} deleted successfully")
+
+        logger.info(f"Item with VerificationId {
+                    verification_id} deleted successfully")
         return {
             'statusCode': 200,
             'body': json.dumps({'message': f"Verification with ID {verification_id} deleted successfully"})
@@ -74,6 +78,7 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': "Internal server error"})
         }
 
+
 def delete_verification(verification_id):
     try:
         table = dynamodb.Table(TABLE_NAME)
@@ -82,11 +87,14 @@ def delete_verification(verification_id):
                 'VerificationId': verification_id
             }
         )
-        logger.info(f"Item with VerificationId {verification_id} deleted successfully")
+        logger.info(f"Item with VerificationId {
+                    verification_id} deleted successfully")
         return cors_response(200, {'message': f"Verification with ID {verification_id} deleted successfully"})
     except Exception as e:
-        logger.error(f"Error deleting item with VerificationId {verification_id}: {str(e)}")
+        logger.error(f"Error deleting item with VerificationId {
+                     verification_id}: {str(e)}")
         return cors_response(500, {'error': f"Error deleting verification with ID {verification_id}"})
+
 
 def cors_response(status_code, body):
     return {
