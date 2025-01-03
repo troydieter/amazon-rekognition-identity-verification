@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_dynamodb as dynamodb,
     aws_apigateway as apigateway,
+    aws_s3 as s3,
     RemovalPolicy,
     CfnOutput,
 )
@@ -15,6 +16,19 @@ class IdPlusSelfieStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Create the S3 bucket
+        bucket = s3.Bucket(
+            self, "UploadBucket",
+            bucket_name=None,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            versioned=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True
+        )
+
 
         # Create DynamoDB table
         verification_table = dynamodb.Table(
@@ -44,10 +58,13 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 "DYNAMODB_TABLE_NAME": verification_table.table_name,
+                "S3_BUCKET_NAME": bucket.bucket_name,
                 "TTL_DAYS": "365"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
+
+        bucket.grant_read_write(id_create_lambda)
 
         id_delete_lambda = _lambda.Function(
             self,
@@ -82,8 +99,9 @@ class IdPlusSelfieStack(Stack):
             "CompareApi",
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=['http://localhost:3000'],
-                allow_methods=['POST', 'DELETE', 'OPTIONS'],
-                allow_headers=['Content-Type', 'X-Api-Key']
+                allow_methods=apigateway.Cors.ALL_METHODS,
+                allow_headers=['Content-Type', 'X-Api-Key'],
+                allow_credentials=True
             )
         )
 
@@ -209,9 +227,9 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key)
+        self.output_cfn_info(verification_table, api, api_key, bucket)
 
-    def output_cfn_info(self, verification_table, api, api_key):
+    def output_cfn_info(self, verification_table, api, api_key, bucket):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
@@ -250,3 +268,4 @@ class IdPlusSelfieStack(Stack):
             description="Stage of the API",
             export_name=f"{self.stack_name}-ApiStage"
         )
+        CfnOutput(self, "BucketName", value=bucket.bucket_name, description="The name of the generated bucket")

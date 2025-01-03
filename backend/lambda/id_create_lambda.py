@@ -10,9 +10,11 @@ from decimal import Decimal, ROUND_DOWN
 # Initialize Rekognition and DynamoDB clients
 rekognition_client = boto3.client('rekognition')
 dynamodb = boto3.resource('dynamodb')
+s3_client = boto3.client('s3')
 
 # Get the DynamoDB table name from environment variable
 TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
+S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 
 TTL_DAYS = int(os.environ.get('TTL_DAYS', 365))  # Default to 365 if not set
 
@@ -87,6 +89,18 @@ def handle_api_request(body):
         dl_bytes = base64.b64decode(dl)
         selfie_bytes = base64.b64decode(selfie)
 
+        # Generate UUID for DynamoDB partition key
+        verification_id = str(uuid.uuid4())
+
+        # Upload files to S3
+        dl_key = f"dl/{verification_id}.jpg"
+        selfie_key = f"selfie/{verification_id}.jpg"
+
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=dl_key, Body=dl_bytes)
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=selfie_key, Body=selfie_bytes)
+
+        logger.info(f"Files uploaded to S3: {dl_key}, {selfie_key}")
+
         # Call Rekognition CompareFaces API
         logger.info("Calling Rekognition CompareFaces API")
         response = rekognition_client.compare_faces(
@@ -94,9 +108,6 @@ def handle_api_request(body):
             SourceImage={'Bytes': dl_bytes},
             TargetImage={'Bytes': selfie_bytes}
         )
-
-        # Generate UUID for DynamoDB partition key
-        verification_id = str(uuid.uuid4())
 
         # Generate current timestamp
         current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -126,7 +137,9 @@ def handle_api_request(body):
             'Similarity': result['similarity'],
             'Message': result['message'],
             'Timestamp': timestamp,
-            'TTL': ttl
+            'TTL': ttl,
+            'DLImageS3Key': dl_key,
+            'SelfieImageS3Key': selfie_key
         }
         table.put_item(Item=item)
         logger.info(f"Result written to DynamoDB with VerificationId: {verification_id}")
@@ -157,7 +170,8 @@ def cors_response(status_code, body):
         'headers': {
             'Access-Control-Allow-Origin': 'http://localhost:3000',
             'Access-Control-Allow-Headers': 'Content-Type,X-Api-Key',
-            'Access-Control-Allow-Methods': 'POST,OPTIONS'
+            'Access-Control-Allow-Methods': 'POST,OPTIONS',
+            'Access-Control-Allow-Credentials': 'true'
         },
         'body': json.dumps(body)
     }
