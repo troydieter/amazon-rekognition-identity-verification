@@ -45,34 +45,6 @@ class IdPlusSelfieStack(Stack):
             ]
         )
 
-        redirect_func = cloudfront.Function(self, "CFFunction", code=cloudfront.FunctionCode.from_file(file_path="lambda/redirect.js"),
-                                            comment="Redirect and rewrite index.html for the SPA")
-
-        # Create the S3 origin bucket
-        origin_bucket = s3.Bucket(
-            self, "OriginBucket",
-            bucket_name=None,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-            enforce_ssl=True,
-            versioned=True,
-            removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True
-        )
-
-        # Create the CloudFront distribution
-        site_distribution = cloudfront.Distribution(self, "SiteDistribution",
-                                                    price_class=cloudfront.PriceClass.PRICE_CLASS_100,
-                                                    default_root_object="index.html",
-                                                    comment="CF Distribution for amazon-rekognition-identity-verification",
-                                                    default_behavior=cloudfront.BehaviorOptions(origin=cloudfront_origins.S3BucketOrigin.with_origin_access_control(origin_bucket),
-                                                                                                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                                                                                                cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
-                                                                                                function_associations=[cloudfront.FunctionAssociation(
-                                                                                                    function=redirect_func,
-                                                                                                    event_type=cloudfront.FunctionEventType.VIEWER_REQUEST)]
-                                                                                                ))
-
         # Create DynamoDB table
         verification_table = dynamodb.Table(
             self, 'VerificationTable',
@@ -277,10 +249,9 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key,
-                             upload_bucket, origin_bucket, site_distribution)
+        self.output_cfn_info(verification_table, api, api_key, upload_bucket)
 
-    def output_cfn_info(self, verification_table, api, api_key, upload_bucket, origin_bucket, site_distribution):
+    def output_cfn_info(self, verification_table, api, api_key, upload_bucket):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
@@ -316,9 +287,3 @@ class IdPlusSelfieStack(Stack):
 
         CfnOutput(self, "UploadBucketName", value=upload_bucket.bucket_name,
                   description="The name of the generated bucket")
-
-        CfnOutput(self, "OriginBucketName", value=origin_bucket.bucket_name,
-                  description="The name of the S3 origin bucket")
-
-        CfnOutput(self, "SiteDistributionName", value=site_distribution.distribution_domain_name,
-                  description="The CloudFront URL")
