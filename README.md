@@ -94,10 +94,9 @@ Before you begin, ensure you have the following installed:
       REACT_APP_API_KEY=xyz123
       ```
 
-4. Build and start:
+4. Build it:
    ```
    npm run build
-   npm run start
    ``` 
 
 ## 03 - Deployment - Backend (`SiteDistributionStack`)
@@ -134,7 +133,7 @@ Before you begin, ensure you have the following installed:
 
 1. Deploy the backend (`./backend`) using AWS CDK (`cdk deploy --all`) leaving the `SiteDistributionStack` stack commented.
 
-2. Load the .env file (using `.env.example` in the `./frontend` directory) and deploy the frontend (`./frontend`) using NodeJS (`npm run build` and `npm run start`)
+2. Load the .env file (using `.env.example` in the `./frontend` directory) and deploy the frontend (`./frontend`) using NodeJS (`npm run build`)
 
 3. Uncomment the `SiteDistributionStack` in `app.py` and use `cdk deploy --all`
 
