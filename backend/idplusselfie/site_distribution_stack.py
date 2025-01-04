@@ -10,12 +10,13 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+
 class SiteDistributionStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        redirect_func = cloudfront.Function(self, "CFFunction", code=cloudfront.FunctionCode.from_file(file_path="lambda/redirect.js"),
-                                            comment="Redirect and rewrite index.html for the SPA")
+        basic_auth_func = cloudfront.Function(self, "Basic_Auth_CF_Function", code=cloudfront.FunctionCode.from_file(file_path="lambda/basic_auth.js"),
+                                              comment="Simple authentication of the user")
 
         # Create the S3 origin bucket
         origin_bucket = s3.Bucket(
@@ -38,12 +39,12 @@ class SiteDistributionStack(Stack):
                                                                                                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                                                                                                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
                                                                                                 function_associations=[cloudfront.FunctionAssociation(
-                                                                                                    function=redirect_func,
+                                                                                                    function=basic_auth_func,
                                                                                                     event_type=cloudfront.FunctionEventType.VIEWER_REQUEST)]
                                                                                                 ))
-        
+
         s3_deployment.BucketDeployment(self, "DeployStaticSiteContents", sources=[s3_deployment.Source.asset("../frontend/build")],
-                         destination_bucket=origin_bucket, distribution=site_distribution, distribution_paths=["/*"])
+                                       destination_bucket=origin_bucket, distribution=site_distribution, distribution_paths=["/*"])
 
         # Outputs to assist debugging and deployment
         self.output_cfn_info(origin_bucket, site_distribution)
