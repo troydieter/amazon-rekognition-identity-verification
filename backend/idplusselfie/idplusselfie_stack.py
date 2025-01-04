@@ -7,6 +7,8 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_apigateway as apigateway,
     aws_s3 as s3,
+    aws_cloudfront as cloudfront,
+    aws_cloudfront_origins as cloudfront_origins,
     RemovalPolicy,
     CfnOutput,
 )
@@ -18,8 +20,8 @@ class IdPlusSelfieStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Create the S3 bucket
-        bucket = s3.Bucket(
+        # Create the S3 upload bucket
+        upload_bucket = s3.Bucket(
             self, "UploadBucket",
             bucket_name=None,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -71,13 +73,13 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 "DYNAMODB_TABLE_NAME": verification_table.table_name,
-                "S3_BUCKET_NAME": bucket.bucket_name,
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
                 "TTL_DAYS": "365"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
 
-        bucket.grant_read_write(id_create_lambda)
+        upload_bucket.grant_read_write(id_create_lambda)
 
         id_delete_lambda = _lambda.Function(
             self,
@@ -90,13 +92,13 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 "DYNAMODB_TABLE_NAME": verification_table.table_name,
-                "S3_BUCKET_NAME": bucket.bucket_name,
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
                 "TTL_DAYS": "365"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
 
-        bucket.grant_read_write(id_delete_lambda)
+        upload_bucket.grant_read_write(id_delete_lambda)
 
         verification_table.grant_read_write_data(id_create_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
@@ -247,9 +249,9 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key, bucket)
+        self.output_cfn_info(verification_table, api, api_key, upload_bucket)
 
-    def output_cfn_info(self, verification_table, api, api_key, bucket):
+    def output_cfn_info(self, verification_table, api, api_key, upload_bucket):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
@@ -283,10 +285,5 @@ class IdPlusSelfieStack(Stack):
                   export_name=f"{self.stack_name}-ApiId"
                   )
 
-        CfnOutput(self, "ApiStage",
-                  value=api.deployment_stage.stage_name,
-                  description="Stage of the API",
-                  export_name=f"{self.stack_name}-ApiStage"
-                  )
-        CfnOutput(self, "BucketName", value=bucket.bucket_name,
+        CfnOutput(self, "UploadBucketName", value=upload_bucket.bucket_name,
                   description="The name of the generated bucket")
