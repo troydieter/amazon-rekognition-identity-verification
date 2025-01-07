@@ -30,6 +30,20 @@ class SiteDistributionStack(Stack):
             auto_delete_objects=True
         )
 
+        sec_policy = cloudfront.ResponseHeadersPolicy(self, "SecPolicy",
+                                security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                                    content_type_options=cloudfront.ResponseHeadersContentTypeOptions(
+                                        override=True),
+                                    frame_options=cloudfront.ResponseHeadersFrameOptions(
+                                        frame_option=cloudfront.HeadersFrameOption.DENY, override=True),
+                                    referrer_policy=cloudfront.ResponseHeadersReferrerPolicy(
+                                        referrer_policy=cloudfront.HeadersReferrerPolicy.NO_REFERRER,
+                                        override=True),
+                                    strict_transport_security=cloudfront.ResponseHeadersStrictTransportSecurity(
+                                        access_control_max_age=Duration.days(30),
+                                        include_subdomains=True, override=True),
+                                ))
+
         # Create the CloudFront distribution
         site_distribution = cloudfront.Distribution(self, "SiteDistribution",
                                                     price_class=cloudfront.PriceClass.PRICE_CLASS_100,
@@ -38,6 +52,7 @@ class SiteDistributionStack(Stack):
                                                     default_behavior=cloudfront.BehaviorOptions(origin=cloudfront_origins.S3BucketOrigin.with_origin_access_control(origin_bucket),
                                                                                                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                                                                                                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                                                                                                response_headers_policy=sec_policy,
                                                                                                 function_associations=[cloudfront.FunctionAssociation(
                                                                                                     function=basic_auth_func,
                                                                                                     event_type=cloudfront.FunctionEventType.VIEWER_REQUEST)]
