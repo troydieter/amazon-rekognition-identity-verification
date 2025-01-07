@@ -53,5 +53,5 @@ class SiteDistributionStack(Stack):
         CfnOutput(self, "OriginBucketName", value=origin_bucket.bucket_name,
                   description="The name of the S3 origin bucket")
 
-        CfnOutput(self, "SiteDistributionName", value=site_distribution.distribution_domain_name,
+        CfnOutput(self, "SiteDistributionName", value=f"https{site_distribution.distribution_domain_name}/",
                   description="The CloudFront URL")
