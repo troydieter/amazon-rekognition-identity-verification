@@ -261,10 +261,16 @@ class IdPlusSelfieStack(Stack):
                   export_name=f"{self.stack_name}-ApiUrl"
                   )
 
-        CfnOutput(self, "ApiEndpoint",
+        CfnOutput(self, "ApiEndpoint_compare-faces",
                   value=f"{api.url}compare-faces",
                   description="Endpoint for face comparison",
-                  export_name=f"{self.stack_name}-ApiEndpoint"
+                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces"
+                  )
+
+        CfnOutput(self, "ApiEndpoint_compare-faces-delete",
+                  value=f"{api.url}compare-faces-delete",
+                  description="Endpoint for deletion of a previous comparison",
+                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",
