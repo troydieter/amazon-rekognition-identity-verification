@@ -4,7 +4,7 @@ function handler(event) {
   
     // basic auth
     var authUser = 'demo'; 
-    var authPass = '2813308004'; 
+    var authPass = 'demo'; 
     var authString = 'Basic ' + (authUser + ':' + authPass).toString('base64');
   
     if (typeof headers.authorization == 'undefined' || headers.authorization.value != authString) {

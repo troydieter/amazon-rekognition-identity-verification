@@ -7,11 +7,11 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_apigateway as apigateway,
     aws_s3 as s3,
-    aws_cloudfront as cloudfront,
-    aws_cloudfront_origins as cloudfront_origins,
+    aws_s3_notifications as s3n,
     RemovalPolicy,
     CfnOutput,
 )
+from cdk_klayers import Klayers
 from constructs import Construct
 
 
@@ -19,6 +19,16 @@ class IdPlusSelfieStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Initialize Klayers Class
+        klayers = Klayers(
+            self,
+            python_version=_lambda.Runtime.PYTHON_3_12,
+            region=self.region
+        )
+
+        # get the latest layer version for the PIL package
+        pil_layer = klayers.layer_version(self, "Pillow")
 
         # Create the S3 upload bucket
         upload_bucket = s3.Bucket(
@@ -35,12 +45,21 @@ class IdPlusSelfieStack(Stack):
                     transitions=[
                         s3.Transition(
                             storage_class=s3.StorageClass.INTELLIGENT_TIERING,
-                            # Move to Intelligent-Tiering after 30 days
-                            transition_after=Duration.days(30)
+                            # Move to Intelligent-Tiering after 31 days
+                            transition_after=Duration.days(31)
                         )
                     ],
                     # Delete objects after 1 year
                     expiration=Duration.days(365)
+                ),
+                # Expire the original uploads after 30 days
+                s3.LifecycleRule(
+                    prefix="dl/",
+                    expiration=Duration.days(30)
+                ),
+                s3.LifecycleRule(
+                    prefix="selfie/",
+                    expiration=Duration.days(30)
                 )
             ]
         )
@@ -99,6 +118,24 @@ class IdPlusSelfieStack(Stack):
         )
 
         upload_bucket.grant_read_write(id_delete_lambda)
+
+        id_compress_lambda = _lambda.Function(
+            self,
+            "IpsHandlerCompress",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_compress_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(30),
+            layers=[pil_layer],
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        upload_bucket.grant_read_write(id_compress_lambda)
 
         verification_table.grant_read_write_data(id_create_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
@@ -248,6 +285,10 @@ class IdPlusSelfieStack(Stack):
             api_key_required=True,
         )
 
+        # S3 Event Notification - Compress
+        upload_bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_compress_lambda))
+
         # Outputs to assist debugging and deployment
         self.output_cfn_info(verification_table, api, api_key, upload_bucket)
 
@@ -270,7 +311,8 @@ class IdPlusSelfieStack(Stack):
         CfnOutput(self, "ApiEndpoint_compare-faces-delete",
                   value=f"{api.url}compare-faces-delete",
                   description="Endpoint for deletion of a previous comparison",
-                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces-delete"
+                  export_name=f"{
+                      self.stack_name}-ApiEndpoint-compare-faces-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",

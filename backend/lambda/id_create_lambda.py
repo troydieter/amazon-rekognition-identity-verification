@@ -106,6 +106,8 @@ def handle_api_request(body):
         # Upload files to S3
         dl_key = f"dl/{verification_id}.jpg"
         selfie_key = f"selfie/{verification_id}.jpg"
+        dl_resized_key = f"resized_dl/{verification_id}.jpg"
+        selfie_resized_key = f"resized_selfie/{verification_id}.jpg"
 
         s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=dl_key, Body=dl_bytes)
         s3_client.put_object(Bucket=S3_BUCKET_NAME,
@@ -146,12 +148,13 @@ def handle_api_request(body):
             'Message': result['message'],
             'Timestamp': timestamp,
             'TTL': ttl,
-            'DLImageS3Key': dl_key,
-            'SelfieImageS3Key': selfie_key
+            'DLImageS3Key': f"s3://{S3_BUCKET_NAME}/{dl_key}",
+            'DLImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{dl_resized_key}",
+            'SelfieImageS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_key}",
+            "SelfieImageResizedS3Key": f"s3://{S3_BUCKET_NAME}/{selfie_resized_key}"
         }
         table.put_item(Item=item)
-        logger.info(f"Result written to DynamoDB with VerificationId: {
-                    verification_id}")
+        logger.info(f"Result written to DynamoDB with VerificationId: {verification_id}")
 
         return cors_response(200, {
             'verificationId': verification_id,

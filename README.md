@@ -35,6 +35,13 @@ This project provides a serverless API for comparing a user's selfie with their 
 4. CloudWatch Logs record the Lambda function's execution details.
 5. The item in the DynamoDB table, based on the primary key `VerificationId` is deleted along with the Amazon S3 objects (one of each). The response is sent back via the API call that it has been deleted successfully.
 
+#### /compare-faces-resizing
+![Visual AWS Architecture](./backend/docs/diagram03.png)
+1. The drivers license (ID) and selfie are uploaded.
+2. CloudWatch Logs record the Lambda function's execution details. The `eventSourceMapping` for Amazon S3 objects occurs, invoking the function.
+3. IAM Role assumes the necessary permissions for the Lambda function.
+4. The file is resized and optimized, and stored in the `dl_resized` or `selfie_resized` key (directories) in the Amazon S3 upload bucket. The lifecycle policy applies for 1yr/optimized and 30days/original.
+
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
 
 This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.174.0`) for infrastructure as code. Follow these steps to deploy:
@@ -127,7 +134,7 @@ Before you begin, ensure you have the following installed:
     SiteDistributionStack.SiteDistributionName = dibc4iuf2q3bb.cloudfront.net
     ```
 
-    and enter the username (remember, it's `demo` as the username and `2813308004` as the password.)
+    and enter the username (remember, it's `demo` as the username and `demo` as the password.)
 
 ## Deployment Recap
 

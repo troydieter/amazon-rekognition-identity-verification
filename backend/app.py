@@ -13,8 +13,8 @@ IdPlusSelfieStack(app, "idplusselfieStack",
                       'CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
                   )
 
-# Leave commented out until you've built (npm run build) the frontend in ../frontend
-# Uncomment the lines below and deploy via: cdk deploy --all
+##  Leave commented out until you've built (npm run build) the frontend in ../frontend
+##  Uncomment the lines below and deploy via: cdk deploy --all
 # SiteDistributionStack(app, "SiteDistributionStack",
 #                   env=cdk.Environment(account=os.getenv(
 #                       'CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
