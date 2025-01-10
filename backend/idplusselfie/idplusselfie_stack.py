@@ -137,10 +137,28 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_compress_lambda)
 
+        ## Commenting out the moderate Lambda function until a step function is introduced
+        # id_moderate_lambda = _lambda.Function(
+        #     self,
+        #     "IpsHandlerModerate",
+        #     code=_lambda.Code.from_asset("lambda"),
+        #     handler="id_moderate_lambda.lambda_handler",
+        #     runtime=_lambda.Runtime.PYTHON_3_12,
+        #     memory_size=256,
+        #     timeout=Duration.seconds(10),
+        #     environment={
+        #         "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+        #         "S3_BUCKET_NAME": upload_bucket.bucket_name
+        #     },
+        #     log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        # )
+
+        # upload_bucket.grant_read_write(id_moderate_lambda)
+
         verification_table.grant_read_write_data(id_create_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
 
-        # Attach an IAM policy for the Lambda function to allow Rekognition actions
+        # Attach an IAM policy for the Entrypoint Lambda function to allow Rekognition actions
         id_create_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -149,6 +167,17 @@ class IdPlusSelfieStack(Stack):
                 resources=["*"],
             )
         )
+
+        ## Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
+        ## Commented out until moderation Lambda function is in a step function
+        # id_moderate_lambda.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=["rekognition:DetectModerationLabels"],
+        #         # Limit this further if possible for better security
+        #         resources=["*"],
+        #     )
+        # )
 
         api = apigateway.RestApi(
             self,
@@ -288,6 +317,11 @@ class IdPlusSelfieStack(Stack):
         # S3 Event Notification - Compress
         upload_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_compress_lambda))
+        
+        ## S3 Event Notification - Moderate
+        ## Commented out until step functions are introduced
+        # upload_bucket.add_event_notification(
+        #     s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_moderate_lambda))
 
         # Outputs to assist debugging and deployment
         self.output_cfn_info(verification_table, api, api_key, upload_bucket)
@@ -311,8 +345,7 @@ class IdPlusSelfieStack(Stack):
         CfnOutput(self, "ApiEndpoint_compare-faces-delete",
                   value=f"{api.url}compare-faces-delete",
                   description="Endpoint for deletion of a previous comparison",
-                  export_name=f"{
-                      self.stack_name}-ApiEndpoint-compare-faces-delete"
+                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",
