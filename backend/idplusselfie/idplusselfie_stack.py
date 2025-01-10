@@ -80,12 +80,12 @@ class IdPlusSelfieStack(Stack):
             time_to_live_attribute='TTL'
         )
 
-        # Define the Lambda functions
-        id_create_lambda = _lambda.Function(
+        ## The Upload and entry-point Lambda function
+        id_upload_lambda = _lambda.Function(
             self,
             "IpsHandler",
             code=_lambda.Code.from_asset("lambda"),
-            handler="id_create_lambda.lambda_handler",
+            handler="id_upload_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             memory_size=256,
             timeout=Duration.seconds(6),
@@ -98,7 +98,7 @@ class IdPlusSelfieStack(Stack):
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
 
-        upload_bucket.grant_read_write(id_create_lambda)
+        upload_bucket.grant_read_write(id_upload_lambda)
 
         id_delete_lambda = _lambda.Function(
             self,
@@ -155,11 +155,11 @@ class IdPlusSelfieStack(Stack):
 
         # upload_bucket.grant_read_write(id_moderate_lambda)
 
-        verification_table.grant_read_write_data(id_create_lambda)
+        verification_table.grant_read_write_data(id_upload_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
 
         # Attach an IAM policy for the Entrypoint Lambda function to allow Rekognition actions
-        id_create_lambda.add_to_role_policy(
+        id_upload_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["rekognition:CompareFaces"],
@@ -229,7 +229,7 @@ class IdPlusSelfieStack(Stack):
         # Compare Faces - Create
         compare_faces_resource_create = api.root.add_resource("compare-faces")
         compare_faces_integration_create = apigateway.LambdaIntegration(
-            id_create_lambda,
+            id_upload_lambda,
             proxy=False,
             integration_responses=[
                 apigateway.IntegrationResponse(
