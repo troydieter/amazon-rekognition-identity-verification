@@ -8,6 +8,8 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_s3 as s3,
     aws_s3_notifications as s3n,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as tasks,
     RemovalPolicy,
     CfnOutput,
 )
@@ -80,10 +82,22 @@ class IdPlusSelfieStack(Stack):
             time_to_live_attribute='TTL'
         )
 
-        ## The Upload and entry-point Lambda function
+        # Now create the Entry Lambda
+        id_entry_lambda = _lambda.Function(
+            self,
+            "EntryHandler",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_entry_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(6),
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        # The Upload Lambda function
         id_upload_lambda = _lambda.Function(
             self,
-            "IpsHandler",
+            "UploadHandler",
             code=_lambda.Code.from_asset("lambda"),
             handler="id_upload_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
@@ -137,23 +151,23 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_compress_lambda)
 
-        ## Commenting out the moderate Lambda function until a step function is introduced
-        # id_moderate_lambda = _lambda.Function(
-        #     self,
-        #     "IpsHandlerModerate",
-        #     code=_lambda.Code.from_asset("lambda"),
-        #     handler="id_moderate_lambda.lambda_handler",
-        #     runtime=_lambda.Runtime.PYTHON_3_12,
-        #     memory_size=256,
-        #     timeout=Duration.seconds(10),
-        #     environment={
-        #         "LOG_LEVEL": "INFO",  # Add a log level for runtime control
-        #         "S3_BUCKET_NAME": upload_bucket.bucket_name
-        #     },
-        #     log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
-        # )
+        # Commenting out the moderate Lambda function until a step function is introduced
+        id_moderate_lambda = _lambda.Function(
+            self,
+            "IpsHandlerModerate",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_moderate_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(10),
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
 
-        # upload_bucket.grant_read_write(id_moderate_lambda)
+        upload_bucket.grant_read_write(id_moderate_lambda)
 
         verification_table.grant_read_write_data(id_upload_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
@@ -168,16 +182,16 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        ## Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
-        ## Commented out until moderation Lambda function is in a step function
-        # id_moderate_lambda.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=["rekognition:DetectModerationLabels"],
-        #         # Limit this further if possible for better security
-        #         resources=["*"],
-        #     )
-        # )
+        # Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
+        # Commented out until moderation Lambda function is in a step function
+        id_moderate_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["rekognition:DetectModerationLabels"],
+                # Limit this further if possible for better security
+                resources=["*"],
+            )
+        )
 
         api = apigateway.RestApi(
             self,
@@ -314,19 +328,70 @@ class IdPlusSelfieStack(Stack):
             api_key_required=True,
         )
 
-        # S3 Event Notification - Compress
-        upload_bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_compress_lambda))
-        
-        ## S3 Event Notification - Moderate
-        ## Commented out until step functions are introduced
-        # upload_bucket.add_event_notification(
-        #     s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_moderate_lambda))
+        # Define the Step Function State Machine before using it
+        entry_task = tasks.LambdaInvoke(
+            self, "Invoke the entry Lambda",
+            lambda_function=id_entry_lambda,
+            output_path="$.Payload"
+        )
+
+        upload_task = tasks.LambdaInvoke(
+            self, "Invoke Upload Lambda",
+            lambda_function=id_upload_lambda,
+            output_path="$.Payload"
+        )
+
+        moderate_task = tasks.LambdaInvoke(
+            self, "Invoke Moderation Lambda",
+            lambda_function=id_moderate_lambda,
+            output_path="$.Payload"
+        )
+
+        compress_task = tasks.LambdaInvoke(
+            self, "Invoke Compress Lambda",
+            lambda_function=id_compress_lambda,
+            output_path="$.Payload"
+        )
+
+        # Define the Step Function workflow
+        definition = (
+            entry_task
+            .next(upload_task)
+            .next(moderate_task)
+            .next(compress_task)
+        )
+
+        # Create the Step Function State Machine
+        state_machine = sfn.StateMachine(
+            self, "IdWorkflowStateMachine",
+            definition=definition,
+            timeout=Duration.minutes(5)
+        )
+
+        # Grant required permissions to the Lambdas
+        state_machine.grant_start_execution(id_entry_lambda)
+        state_machine.grant_start_execution(id_upload_lambda)
+        state_machine.grant_start_execution(id_moderate_lambda)
+        state_machine.grant_start_execution(id_compress_lambda)
+
+        # Add the needed enviro variables for the entry lambda
+        id_entry_lambda.add_environment(
+            "STATE_MACHINE_ARN", state_machine.state_machine_arn
+        )
+
+        # AWS IAM policies to execute
+        id_entry_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:StartExecution"],
+                resources=[state_machine.state_machine_arn]
+            )
+        )
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key, upload_bucket)
+        self.output_cfn_info(verification_table, api,
+                             api_key, upload_bucket, state_machine)
 
-    def output_cfn_info(self, verification_table, api, api_key, upload_bucket):
+    def output_cfn_info(self, verification_table, api, api_key, upload_bucket, state_machine):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
@@ -368,3 +433,7 @@ class IdPlusSelfieStack(Stack):
 
         CfnOutput(self, "UploadBucketName", value=upload_bucket.bucket_name,
                   description="The name of the generated bucket")
+
+        CfnOutput(self, "StateMachineArn", value=state_machine.state_machine_arn,
+                  description="The ARN of the Step Function"
+                  )
