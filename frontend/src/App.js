@@ -1,11 +1,24 @@
 import { useState } from "react";
 import axios from "axios";
+import "./App.css";
+import { Authenticator, useTheme, View, Image, Text, Heading, useAuthenticator, Button } from "@aws-amplify/ui-react";
+import { Amplify } from "aws-amplify";
+
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolClientId: `${process.env.REACT_APP_USERPOOL_CLIENTID}`,
+      userPoolId: `${process.env.REACT_APP_USERPOOL_ID}`,
+    },
+  },
+});
 
 function App() {
   const [licenseFile, setLicenseFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
   const [licenseFileName, setLicenseFileName] = useState("No file chosen");
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
+  const [count, setCount] = useState(0);
 
   const API_URL = `${process.env.REACT_APP_API_URL}/compare-faces`;
 
@@ -87,45 +100,72 @@ function App() {
     setSelfieFileName(file ? file.name : "No file chosen");
   };
 
+  const formFields = {
+    signUp: {
+      email: {
+        order: 1
+      },
+      username: {
+        order: 2
+      },
+      password: {
+        order: 3
+      },
+      confirm_password: {
+        order: 4
+      }
+    }
+  };
+
   return (
-    <div className="App">
-      <div className="upload-container">
-        <div className="upload-box">
-          <h3>Upload Driver's License</h3>
-          <input
-            type="file"
-            id="license-file"
-            className="file-input"
-            onChange={handleLicenseChange}
-            accept="image/*"
-          />
-          <label htmlFor="license-file" className="file-label">
-            Choose File
-          </label>
-          <div className="file-name">{licenseFileName}</div>
-        </div>
+    <Authenticator formFields={formFields}>
+      {({ signOut, user }) => (
+        <div className="App">
+          <header className="App-header">
+            <h1>Hello {user?.username}</h1>
+            <button onClick={signOut} className="sign-out-btn">Sign out</button>
+          </header>
+          
+          <main className="app-main">
+            <div className="upload-container">
+              <div className="upload-box">
+                <h3>Upload Driver's License</h3>
+                <input
+                  type="file"
+                  id="license-file"
+                  className="file-input"
+                  onChange={handleLicenseChange}
+                  accept="image/*"
+                />
+                <label htmlFor="license-file" className="file-label">
+                  Choose File
+                </label>
+                <div className="file-name">{licenseFileName}</div>
+              </div>
 
-        <div className="upload-box">
-          <h3>Upload Self-picture (Selfie)</h3>
-          <input
-            type="file"
-            id="selfie-file"
-            className="file-input"
-            onChange={handleSelfieChange}
-            accept="image/*"
-          />
-          <label htmlFor="selfie-file" className="file-label">
-            Choose File
-          </label>
-          <div className="file-name">{selfieFileName}</div>
-        </div>
+              <div className="upload-box">
+                <h3>Upload Self-picture (Selfie)</h3>
+                <input
+                  type="file"
+                  id="selfie-file"
+                  className="file-input"
+                  onChange={handleSelfieChange}
+                  accept="image/*"
+                />
+                <label htmlFor="selfie-file" className="file-label">
+                  Choose File
+                </label>
+                <div className="file-name">{selfieFileName}</div>
+              </div>
+            </div>
 
-        <button className="upload-button" onClick={uploadFiles}>
-          Verify Identity
-        </button>
-      </div>
-    </div>
+            <button className="verify-button" onClick={uploadFiles}>
+              Verify Identity
+            </button>
+          </main>
+        </div>
+      )}
+    </Authenticator>
   );
 }
-
 export default App;

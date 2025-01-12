@@ -6,19 +6,19 @@ A robust solution for digital identity verification using Amazon Rekognition.
 
 This project provides a serverless API for comparing a user's selfie with their driver's license photo, leveraging the power of Amazon Rekognition for accurate face matching.
 
-![Frontend](./backend/docs/front_end.png)
+![Frontend](./docs/front_end.png)
 
 #### Confirmation of match:
-![Confirm](./backend/docs/confirm_yes.png)
+![Confirm](./docs/confirm_yes.png)
 
 #### No match found:
-![Fail](./backend/docs/fail_confirmation.png)
+![Fail](./docs/fail_confirmation.png)
 
 ## Architecture
 
 ### AWS Solution Architecture
 #### /compare-faces
-![Visual AWS Architecture](./backend/docs/diagram01.png)
+![Visual AWS Architecture](./docs/diagram01.png)
 1. User uploads files (ID + Selfie) to the system.
 2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
 3. IAM Role assumes the necessary permissions for the Lambda function.
@@ -28,7 +28,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 7. Amazon Rekognition processes the images and returns a response (box at the bottom).
 
 #### /compare-faces-delete
-![Visual AWS Architecture](./backend/docs/diagram02.png)
+![Visual AWS Architecture](./docs/diagram02.png)
 1. Admin user receives a request to delete an identity that has been verified. They retrieve the `VerificationId` value as initially registered by the user.
 2. A `DELETE` API call is made to API Gateway with `VerificationId` as a parameter and the necessary `x-api-key` value in the header.
 3. IAM Role assumes the necessary permissions for the Lambda function.
@@ -36,15 +36,16 @@ This project provides a serverless API for comparing a user's selfie with their 
 5. The item in the DynamoDB table, based on the primary key `VerificationId` is deleted along with the Amazon S3 objects (one of each). The response is sent back via the API call that it has been deleted successfully.
 
 #### /compare-faces-resizing
-![Visual AWS Architecture](./backend/docs/diagram03.png)
+![Visual AWS Architecture](./docs/diagram03.png)
 1. The drivers license (ID) and selfie are uploaded.
 2. CloudWatch Logs record the Lambda function's execution details. The `eventSourceMapping` for Amazon S3 objects occurs, invoking the function.
 3. IAM Role assumes the necessary permissions for the Lambda function.
 4. The file is resized and optimized, and stored in the `dl_resized` or `selfie_resized` key (directories) in the Amazon S3 upload bucket. The lifecycle policy applies for 1yr/optimized and 30days/original.
 
+# Setup
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
 
-This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.174.0`) for infrastructure as code. Follow these steps to deploy:
+This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.175.1`) for infrastructure as code. Follow these steps to deploy:
 
 1. Ensure you have an AWS account and an AWS IAM user/role with appropriate permissions.
 
@@ -80,17 +81,21 @@ Before you begin, ensure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 
-1. Change directory to the frontend:
+1. **NOTE:** You will need to manually deploy Amazon Cognito. Deploy the Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html) Here is also an example configuration of a Cognito user pool in the AWS console:
+
+    ![Manual setup](./docs/manual_cognito_setup.png)
+
+2. Change directory to the frontend:
    ```
    cd frontend
    ```
 
-2. Install dependencies:
+3. Install dependencies:
    ```
-   npm install
+   npm install --legacy-peer-deps
    ```
 
-3. Set up environment variables:
+4. Set up environment variables:
    - Copy the `.env.example` file to a new file named `.env`:
      ```
      cp .env.example.env .env
@@ -99,11 +104,13 @@ Before you begin, ensure you have the following installed:
      ```
       REACT_APP_API_URL=https://example.execute-api.REGION.amazonaws.com/prod
       REACT_APP_API_KEY=xyz123
+      REACT_APP_USERPOOL_CLIENTID=example123
+      REACT_APP_USERPOOL_ID=us-east-1_example
       ```
 
-4. Build it:
+5. Build it:
    ```
-   npm run build
+   npm run build --legacy-peer-deps
    ``` 
 
 ## 03 - Deployment - Backend (`SiteDistributionStack`)
@@ -135,6 +142,11 @@ Before you begin, ensure you have the following installed:
     ```
 
     and enter the username (remember, it's `demo` as the username and `demo` as the password.)
+
+## TO-DO
+* Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
+* Update the API calls to include the user session token.
+* Add the Cognito User Pool Authorizer to the API 
 
 ## Deployment Recap
 
