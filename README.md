@@ -89,7 +89,7 @@ Before you begin, ensure you have the following installed:
 
 3. Install dependencies:
    ```
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 4. Set up environment variables:
@@ -107,7 +107,7 @@ Before you begin, ensure you have the following installed:
 
 5. Build it:
    ```
-   npm run build
+   npm run build --legacy-peer-deps
    ``` 
 
 ## 03 - Deployment - Backend (`SiteDistributionStack`)
