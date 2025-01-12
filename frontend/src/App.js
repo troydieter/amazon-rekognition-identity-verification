@@ -104,44 +104,49 @@ function App() {
     <Authenticator socialProviders={["google"]}>
       {({ signOut, user }) => (
         <div className="App">
-          <h1>Hello {user?.username}</h1>
-          <button onClick={signOut}>Sign out</button>
+          <header className="App-header">
+            <h1>Hello {user?.username}</h1>
+          </header>
           
-          <div className="upload-container">
-            <div className="upload-box">
-              <h3>Upload Driver's License</h3>
-              <input
-                type="file"
-                id="license-file"
-                className="file-input"
-                onChange={handleLicenseChange}
-                accept="image/*"
-              />
-              <label htmlFor="license-file" className="file-label">
-                Choose File
-              </label>
-              <div className="file-name">{licenseFileName}</div>
+          <main className="app-main">
+            <div className="upload-container">
+              <div className="upload-box">
+                <h3>Upload Driver's License</h3>
+                <input
+                  type="file"
+                  id="license-file"
+                  className="file-input"
+                  onChange={handleLicenseChange}
+                  accept="image/*"
+                />
+                <label htmlFor="license-file" className="file-label">
+                  Choose File
+                </label>
+                <div className="file-name">{licenseFileName}</div>
+              </div>
+
+              <div className="upload-box">
+                <h3>Upload Self-picture (Selfie)</h3>
+                <input
+                  type="file"
+                  id="selfie-file"
+                  className="file-input"
+                  onChange={handleSelfieChange}
+                  accept="image/*"
+                />
+                <label htmlFor="selfie-file" className="file-label">
+                  Choose File
+                </label>
+                <div className="file-name">{selfieFileName}</div>
+              </div>
             </div>
 
-            <div className="upload-box">
-              <h3>Upload Self-picture (Selfie)</h3>
-              <input
-                type="file"
-                id="selfie-file"
-                className="file-input"
-                onChange={handleSelfieChange}
-                accept="image/*"
-              />
-              <label htmlFor="selfie-file" className="file-label">
-                Choose File
-              </label>
-              <div className="file-name">{selfieFileName}</div>
-            </div>
-
-            <button className="upload-button" onClick={uploadFiles}>
+            <button className="verify-button" onClick={uploadFiles}>
               Verify Identity
             </button>
-          </div>
+          </main>
+
+          <button onClick={signOut} className="sign-out-btn">Sign out</button>
         </div>
       )}
     </Authenticator>

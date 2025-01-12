@@ -10,91 +10,48 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .App-header {
-  background-color: #3f51b5;
-  color: white;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  width: 100%;
+  padding: 1rem 0;
 }
 
 .App-header h1 {
   margin: 0;
   font-size: 1.5rem;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-}
-
-.user-info span {
-  margin-right: 1rem;
-}
-
-.sign-out-btn {
-  background-color: transparent;
-  border: 1px solid white;
-  color: white;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.sign-out-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  color: #333;
 }
 
 .app-main {
-  flex-grow: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  width: 100%;
+  max-width: 600px;
+  margin: 2rem 0;
 }
 
 .upload-container {
   display: flex;
-  justify-content: space-around;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 800px;
-  margin-bottom: 2rem;
 }
 
 .upload-box {
   background-color: white;
+  border: 2px dashed #ccc;
   border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  width: 45%;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .upload-box h3 {
@@ -109,7 +66,7 @@ body {
 
 .file-label {
   display: inline-block;
-  background-color: #3f51b5;
+  background-color: #4285f4;
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -118,7 +75,7 @@ body {
 }
 
 .file-label:hover {
-  background-color: #303f9f;
+  background-color: #3367d6;
 }
 
 .file-name {
@@ -136,21 +93,35 @@ body {
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s;
+  margin-top: 1rem;
 }
 
 .verify-button:hover {
   background-color: #45a049;
 }
 
+.sign-out-btn {
+  background-color: #f44336;
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  border-radius: 4px;
+  margin-top: 2rem;
+}
+
+.sign-out-btn:hover {
+  background-color: #d32f2f;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
-  .upload-container {
-    flex-direction: column;
-    align-items: center;
+  .App {
+    padding: 10px;
   }
 
   .upload-box {
-    width: 90%;
-    margin-bottom: 1rem;
+    padding: 1rem;
   }
 }
