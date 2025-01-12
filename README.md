@@ -141,7 +141,9 @@ Before you begin, ensure you have the following installed:
     and enter the username (remember, it's `demo` as the username and `demo` as the password.)
 
 ## TO-DO
-1. Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
+* Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
+* Update the API calls to include the user session token.
+* Add the Cognito User Pool Authorizer to the API 
 
 ## Deployment Recap
 
