@@ -65,7 +65,7 @@ a:hover {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 10vh;
   padding: 2rem;
   background-color: #f6f6f6;
 }
