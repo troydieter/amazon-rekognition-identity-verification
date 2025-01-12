@@ -15,8 +15,8 @@ class SiteDistributionStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        basic_auth_func = cloudfront.Function(self, "Basic_Auth_CF_Function", code=cloudfront.FunctionCode.from_file(file_path="lambda/basic_auth.js"),
-                                              comment="Simple authentication of the user")
+        redirect_func = cloudfront.Function(self, "Redirect_CF_Function", code=cloudfront.FunctionCode.from_file(file_path="lambda/redirect_func.js"),
+                                              comment="Redirect for SPA app's")
 
         # Create the S3 origin bucket
         origin_bucket = s3.Bucket(
@@ -54,7 +54,7 @@ class SiteDistributionStack(Stack):
                                                                                                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
                                                                                                 response_headers_policy=sec_policy,
                                                                                                 function_associations=[cloudfront.FunctionAssociation(
-                                                                                                    function=basic_auth_func,
+                                                                                                    function=redirect_func,
                                                                                                     event_type=cloudfront.FunctionEventType.VIEWER_REQUEST)]
                                                                                                 ))
 
