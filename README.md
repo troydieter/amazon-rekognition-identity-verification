@@ -80,17 +80,19 @@ Before you begin, ensure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 
-1. Change directory to the frontend:
+1. Deploy an AWS Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html)
+
+2. Change directory to the frontend:
    ```
    cd frontend
    ```
 
-2. Install dependencies:
+3. Install dependencies:
    ```
    npm install
    ```
 
-3. Set up environment variables:
+4. Set up environment variables:
    - Copy the `.env.example` file to a new file named `.env`:
      ```
      cp .env.example.env .env
@@ -99,9 +101,11 @@ Before you begin, ensure you have the following installed:
      ```
       REACT_APP_API_URL=https://example.execute-api.REGION.amazonaws.com/prod
       REACT_APP_API_KEY=xyz123
+      REACT_APP_USERPOOL_CLIENTID=example123
+      REACT_APP_USERPOOL_ID=us-east-1_example
       ```
 
-4. Build it:
+5. Build it:
    ```
    npm run build
    ``` 
@@ -135,6 +139,9 @@ Before you begin, ensure you have the following installed:
     ```
 
     and enter the username (remember, it's `demo` as the username and `demo` as the password.)
+
+## TO-DO
+1. Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
 
 ## Deployment Recap
 
