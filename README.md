@@ -42,6 +42,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 3. IAM Role assumes the necessary permissions for the Lambda function.
 4. The file is resized and optimized, and stored in the `dl_resized` or `selfie_resized` key (directories) in the Amazon S3 upload bucket. The lifecycle policy applies for 1yr/optimized and 30days/original.
 
+# Setup
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
 
 This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.175.1`) for infrastructure as code. Follow these steps to deploy:
@@ -80,7 +81,9 @@ Before you begin, ensure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 
-1. **NOTE:** You will need to manually deploy Amazon Cognito. Deploy the Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html)
+1. **NOTE:** You will need to manually deploy Amazon Cognito. Deploy the Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html) Here is also an example configuration of a Cognito user pool in the AWS console:
+
+    ![Manual setup](./docs/manual_cognito_setup.png)
 
 2. Change directory to the frontend:
    ```
@@ -142,7 +145,6 @@ Before you begin, ensure you have the following installed:
 
 ## TO-DO
 * Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
-![Manual setup](./docs/manual_cognito_setup.png)
 * Update the API calls to include the user session token.
 * Add the Cognito User Pool Authorizer to the API 
 
