@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import "./App.css";
-import { Authenticator } from "@aws-amplify/ui-react";
+import { Authenticator, useTheme, View, Image, Text, Heading, useAuthenticator, Button } from "@aws-amplify/ui-react";
 import { Amplify } from "aws-amplify";
 
 Amplify.configure({
@@ -100,8 +100,25 @@ function App() {
     setSelfieFileName(file ? file.name : "No file chosen");
   };
 
+  const formFields = {
+    signUp: {
+      email: {
+        order: 1
+      },
+      username: {
+        order: 2
+      },
+      password: {
+        order: 3
+      },
+      confirm_password: {
+        order: 4
+      }
+    }
+  };
+
   return (
-    <Authenticator>
+    <Authenticator formFields={formFields}>
       {({ signOut, user }) => (
         <div className="App">
           <header className="App-header">
