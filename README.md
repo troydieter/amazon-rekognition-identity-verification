@@ -80,7 +80,7 @@ Before you begin, ensure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 
-1. Deploy an AWS Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html)
+1. **NOTE:** You will need to manually deploy Amazon Cognito. Deploy the Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html)
 
 2. Change directory to the frontend:
    ```
