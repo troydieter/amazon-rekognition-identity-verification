@@ -7,8 +7,8 @@ import { Amplify } from "aws-amplify";
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolClientId: "000",
-      userPoolId: "000",
+      userPoolClientId: `${process.env.REACT_APP_USERPOOL_CLIENTID}`,
+      userPoolId: `${process.env.REACT_APP_USERPOOL_ID}`,
     },
   },
 });
