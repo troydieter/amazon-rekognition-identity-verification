@@ -18,8 +18,7 @@ body {
 .App-header {
   width: 100%;
   padding: 0.5rem;
-  background-color: #282c34;
-  color: white;
+  color: black;
   margin-bottom: 1rem;
 }
 
@@ -49,7 +48,7 @@ body {
   border: 2px dashed #ccc;
   border-radius: 8px;
   padding: 1rem;
-  width: 100%;
+  width: 130%;
   box-sizing: border-box;
 }
 
