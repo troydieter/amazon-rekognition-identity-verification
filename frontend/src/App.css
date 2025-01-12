@@ -11,30 +11,29 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px;
+  padding: 10px;
   box-sizing: border-box;
 }
 
 .App-header {
   width: 100%;
-  padding: 1rem 0;
+  padding: 0.5rem;
+  background-color: #282c34;
+  color: white;
+  margin-bottom: 1rem;
 }
 
 .App-header h1 {
   margin: 0;
-  font-size: 1.5rem;
-  color: #333;
+  font-size: 1.2rem;
 }
 
 .app-main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   width: 100%;
-  max-width: 600px;
-  margin: 2rem 0;
+  max-width: 400px;
 }
 
 .upload-container {
@@ -42,22 +41,23 @@ body {
   flex-direction: column;
   align-items: center;
   width: 100%;
+  gap: 1rem;
 }
 
 .upload-box {
   background-color: white;
   border: 2px dashed #ccc;
   border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1rem;
   width: 100%;
   box-sizing: border-box;
 }
 
 .upload-box h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   color: #333;
+  font-size: 1rem;
 }
 
 .file-input {
@@ -72,6 +72,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s;
+  font-size: 0.9rem;
 }
 
 .file-label:hover {
@@ -80,7 +81,7 @@ body {
 
 .file-name {
   margin-top: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: #666;
 }
 
@@ -94,6 +95,7 @@ body {
   cursor: pointer;
   transition: background-color 0.3s;
   margin-top: 1rem;
+  width: 100%;
 }
 
 .verify-button:hover {
@@ -108,7 +110,8 @@ body {
   cursor: pointer;
   transition: background-color 0.3s;
   border-radius: 4px;
-  margin-top: 2rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
 }
 
 .sign-out-btn:hover {
@@ -118,10 +121,10 @@ body {
 /* Responsive design */
 @media (max-width: 768px) {
   .App {
-    padding: 10px;
+    padding: 5px;
   }
 
   .upload-box {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 }

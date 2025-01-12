@@ -101,11 +101,12 @@ function App() {
   };
 
   return (
-    <Authenticator socialProviders={["google"]}>
+    <Authenticator>
       {({ signOut, user }) => (
         <div className="App">
           <header className="App-header">
             <h1>Hello {user?.username}</h1>
+            <button onClick={signOut} className="sign-out-btn">Sign out</button>
           </header>
           
           <main className="app-main">
@@ -145,12 +146,9 @@ function App() {
               Verify Identity
             </button>
           </main>
-
-          <button onClick={signOut} className="sign-out-btn">Sign out</button>
         </div>
       )}
     </Authenticator>
   );
 }
-
 export default App;
