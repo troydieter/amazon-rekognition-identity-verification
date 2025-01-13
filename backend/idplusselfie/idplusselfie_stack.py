@@ -9,7 +9,6 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_s3_notifications as s3n,
     aws_cognito as cognito,
-    aws_guardduty as guardduty,
     RemovalPolicy,
     CfnOutput,
 )
@@ -65,56 +64,6 @@ class IdPlusSelfieStack(Stack):
                 )
             ]
         )
-
-        ####
-        ## GuardDuty Configuration for the Upload Bucket
-        ## Uncomment below to enable the Detector (and use GuardDuty for scans of uploaded objects)
-        ####
-
-        # # Create an IAM role for GuardDuty
-        # guardduty_role = iam.Role(
-        #     self, "GuardDutyRole",
-        #     assumed_by=iam.ServicePrincipal("guardduty.amazonaws.com"),
-        #     description="Role for GuardDuty to access S3 bucket"
-        # )
-
-        # # Grant necessary permissions to the role
-        # upload_bucket.grant_read(guardduty_role)
-
-        # # Create GuardDuty Malware Protection Plan
-        # malware_protection_plan = guardduty.CfnMalwareProtectionPlan(
-        #     self, "MalwareProtectionPlan",
-        #     protected_resource=guardduty.CfnMalwareProtectionPlan.CFNProtectedResourceProperty(
-        #         s3_bucket=guardduty.CfnMalwareProtectionPlan.S3BucketProperty(
-        #             bucket_name=upload_bucket.bucket_name,
-        #             object_prefixes=[""]  # Protect all objects; adjust if needed
-        #         )
-        #     ),
-        #     role=guardduty_role.role_arn,
-        #     actions=guardduty.CfnMalwareProtectionPlan.CFNActionsProperty(
-        #         tagging=guardduty.CfnMalwareProtectionPlan.CFNTaggingProperty(
-        #             status="ENABLED"
-        #         )
-        #     ),
-        #     tags=[{
-        #         "key": "Purpose",
-        #         "value": "S3 Malware Protection"
-        #     }]
-        # )
-
-        # # Ensure GuardDuty is enabled in the account with S3 protection
-        # guardduty_detector = guardduty.CfnDetector(
-        #     self, "GuardDutyDetector",
-        #     enable=True,
-        #     data_sources=guardduty.CfnDetector.CFNDataSourceConfigurationsProperty(
-        #         s3_logs=guardduty.CfnDetector.CFNS3LogsConfigurationProperty(
-        #             enable=True
-        #         )
-        #     )
-        # )
-
-        # # Add dependency to ensure GuardDuty is enabled before creating the protection plan
-        # malware_protection_plan.add_dependency(guardduty_detector)
 
         # Create DynamoDB table
         verification_table = dynamodb.Table(

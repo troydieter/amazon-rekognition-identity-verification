@@ -65,15 +65,6 @@ This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.175
 
 5. Install dependencies: `python -m pip install -r requirements.txt`
 
-6. **LEAVE** the following commented in `backend/app.py`, it will be un-commented after the frontend is deployed:
-
-    ```
-    # SiteDistributionStack(app, "SiteDistributionStack",
-    #                   env=cdk.Environment(account=os.getenv(
-    #                       'CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
-    #                   )
-    ```
-
 6. Deploy the stack: `cdk deploy --all`
 
 ## 02 - Deployment - Frontend
@@ -117,22 +108,13 @@ Before you begin, ensure you have the following installed:
     cd ../backend
     ```
 
-2. Uncomment the `SiteDistributionStack` in `app.py` as shown:
-
-    ```
-      SiteDistributionStack(app, "SiteDistributionStack",
-                        env=cdk.Environment(account=os.getenv(
-                        'CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
-                        )
-    ```
-
-3. Deploy the stack, which now includes both the `IdPlusSelfieStack` and the `SiteDistributionStack`:
+2. Deploy the stack, which now includes both the `IdPlusSelfieStack` and the `SiteDistributionStack`:
 
     ```
     cdk deploy --all
     ```
 
-4. Use the `SiteDistributionStack.SiteDistributionName` CloudFormation output to visit the site:
+3. Use the `SiteDistributionStack.SiteDistributionName` CloudFormation output to visit the site:
 
     ```
     SiteDistributionStack.SiteDistributionName = dibc4iuf2q3bb.cloudfront.net
@@ -151,13 +133,12 @@ Before you begin, ensure you have the following installed:
 
 2. Load the .env file (using `.env.example` in the `./frontend` directory) and deploy the frontend (`./frontend`) using NodeJS (`npm run build`)
 
-3. Uncomment the `SiteDistributionStack` in `app.py` and use `cdk deploy --all`
+3. Change back to the backend (`./backend`) and use `cdk deploy --all`
 
 4. Destroy when done:
 
    ```
-   cd ../backend
-   cdk destroy
+   cdk destroy --all
    ```
 
 ## Clean Up
@@ -165,7 +146,7 @@ Before you begin, ensure you have the following installed:
 To remove all deployed backend resources:
 
 ```
-cdk destroy
+cdk destroy --all
 ```
 
 ## Security
