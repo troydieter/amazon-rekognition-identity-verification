@@ -6,7 +6,8 @@ A robust solution for digital identity verification using Amazon Rekognition.
 
 This project provides a serverless API for comparing a user's selfie with their driver's license photo, leveraging the power of Amazon Rekognition for accurate face matching.
 
-![Frontend](./docs/front_end.png)
+![Frontend01](./docs/front_end01.png)
+![Frontend02](./docs/front_end02.png)
 
 #### Confirmation of match:
 ![Confirm](./docs/confirm_yes.png)
@@ -81,21 +82,17 @@ Before you begin, ensure you have the following installed:
 - Node.js (v14.0.0 or later)
 - npm (v6.0.0 or later)
 
-1. **NOTE:** You will need to manually deploy Amazon Cognito. Deploy the Cognito User Pool manually via the AWS CLI or the AWS Console. [More information is available here.](https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-user-pools.html) Here is also an example configuration of a Cognito user pool in the AWS console:
-
-    ![Manual setup](./docs/manual_cognito_setup.png)
-
-2. Change directory to the frontend:
+1. Change directory to the frontend:
    ```
    cd frontend
    ```
 
-3. Install dependencies:
+2. Install dependencies:
    ```
    npm install --legacy-peer-deps
    ```
 
-4. Set up environment variables:
+3. Set up environment variables:
    - Copy the `.env.example` file to a new file named `.env`:
      ```
      cp .env.example.env .env
@@ -108,7 +105,7 @@ Before you begin, ensure you have the following installed:
       REACT_APP_USERPOOL_ID=us-east-1_example
       ```
 
-5. Build it:
+4. Build it:
    ```
    npm run build --legacy-peer-deps
    ``` 
@@ -144,9 +141,9 @@ Before you begin, ensure you have the following installed:
     and enter the username (remember, it's `demo` as the username and `demo` as the password.)
 
 ## TO-DO
-* Migrate the AWS Cognito process from manual creation to using AWS CDK. Currently, you must manually provision the AWS Cognitio User Pool and set the necessary attributes. Once that is created, you export the UserPool `ClientID` and `ID` to the `.\frontend\.env` file.
-* Update the API calls to include the user session token.
-* Add the Cognito User Pool Authorizer to the API 
+* M̵i̵g̵r̵a̵t̵e̵ ̵t̵h̵e̵ ̵A̵W̵S̵ ̵C̵o̵g̵n̵i̵t̵o̵ ̵p̵r̵o̵c̵e̵s̵s̵ ̵f̵r̵o̵m̵ ̵m̵a̵n̵u̵a̵l̵ ̵c̵r̵e̵a̵t̵i̵o̵n̵ ̵t̵o̵ ̵u̵s̵i̵n̵g̵ ̵A̵W̵S̵ ̵C̵D̵K̵.̵ ̵C̵u̵r̵r̵e̵n̵t̵l̵y̵,̵ ̵y̵o̵u̵ ̵m̵u̵s̵t̵ ̵m̵a̵n̵u̵a̵l̵l̵y̵ ̵p̵r̵o̵v̵i̵s̵i̵o̵n̵ ̵t̵h̵e̵ ̵A̵W̵S̵ ̵C̵o̵g̵n̵i̵t̵i̵o̵ ̵U̵s̵e̵r̵ ̵P̵o̵o̵l̵ ̵a̵n̵d̵ ̵s̵e̵t̵ ̵t̵h̵e̵ ̵n̵e̵c̵e̵s̵s̵a̵r̵y̵ ̵a̵t̵t̵r̵i̵b̵u̵t̵e̵s̵.̵ ̵O̵n̵c̵e̵ ̵t̵h̵a̵t̵ ̵i̵s̵ ̵c̵r̵e̵a̵t̵e̵d̵,̵ ̵y̵o̵u̵ ̵e̵x̵p̵o̵r̵t̵ ̵t̵h̵e̵ ̵U̵s̵e̵r̵P̵o̵o̵l̵ ̵`̵C̵l̵i̵e̵n̵t̵I̵D̵`̵ ̵a̵n̵d̵ ̵`̵I̵D̵`̵ ̵t̵o̵ ̵t̵h̵e̵ ̵`̵.̵\̵f̵r̵o̵n̵t̵e̵n̵d̵\̵.̵e̵n̵v̵`̵ ̵f̵i̵l̵e̵.̵
+* U̵p̵d̵a̵t̵e̵ ̵t̵h̵e̵ ̵A̵P̵I̵ ̵c̵a̵l̵l̵s̵ ̵t̵o̵ ̵i̵n̵c̵l̵u̵d̵e̵ ̵t̵h̵e̵ ̵u̵s̵e̵r̵ ̵s̵e̵s̵s̵i̵o̵n̵ ̵t̵o̵k̵e̵n̵.̵
+* A̵d̵d̵ ̵t̵h̵e̵ ̵C̵o̵g̵n̵i̵t̵o̵ ̵U̵s̵e̵r̵ ̵P̵o̵o̵l̵ ̵A̵u̵t̵h̵o̵r̵i̵z̵e̵r̵ ̵t̵o̵ ̵t̵h̵e̵ ̵A̵P̵I̵ ̵
 
 ## Deployment Recap
 
@@ -162,80 +159,6 @@ Before you begin, ensure you have the following installed:
    cd ../backend
    cdk destroy
    ```
-
-# API Documentation
-
-## Endpoints
-
-### Compare Faces
-
-Create a new face comparison.
-
-- URL: `/compare-faces`
-- Method: `POST`
-- Auth: API Key required
-- Content-Type: `application/json`
-
-Request Body:
-```
-{
-  "selfie": "base64_encoded_selfie_image",
-  "dl": "base64_encoded_drivers_license_image"
-}
-```
-
-Response:
-```
-{
-  "verificationId": "string",
-  "result": {
-    "similarity": "number",
-    "message": "string",
-    "timestamp": "string (ISO 8601 format)"
-  }
-}
-```
-
-### Delete Comparison
-
-Delete an existing face comparison.
-
-- URL: `/compare-faces-delete`
-- Method: `DELETE`
-- Auth: API Key required
-- Query Parameters:
-  - `verificationId`: string (required)
-
-Response:
-```
-{
-  "message": "string"
-}
-```
-
-## Authentication
-
-All endpoints require an API key to be included in the request headers:
-
-`X-Api-Key: your_api_key_here`
-
-## Rate Limiting
-
-The API is subject to the following rate limits:
-- Rate limit: 10 requests per second
-- Burst limit: 2 requests
-
-## Error Responses
-
-The API uses standard HTTP response codes to indicate the success or failure of requests. In case of errors, additional information may be provided in the response body.
-
-Common error codes:
-- 400: Bad Request
-- 401: Unauthorized
-- 403: Forbidden
-- 404: Not Found
-- 429: Too Many Requests
-- 500: Internal Server Error
 
 ## Clean Up
 
