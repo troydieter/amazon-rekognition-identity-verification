@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_s3 as s3,
     aws_s3_notifications as s3n,
+    aws_cognito as cognito,
     RemovalPolicy,
     CfnOutput,
 )
@@ -80,7 +81,50 @@ class IdPlusSelfieStack(Stack):
             time_to_live_attribute='TTL'
         )
 
-        ## The Upload and entry-point Lambda function
+        # Create the Cognito User Pool
+        # Create Cognito User Pool
+        user_pool = cognito.UserPool(
+            self, "IdentityUserPool",
+            self_sign_up_enabled=True,
+            sign_in_aliases=cognito.SignInAliases(username=True, email=True),
+            auto_verify=cognito.AutoVerifiedAttrs(email=True),
+            password_policy=cognito.PasswordPolicy(
+                min_length=8,
+                require_lowercase=True,
+                require_digits=True,
+                require_uppercase=True,
+                require_symbols=True
+            ),
+            standard_attributes=cognito.StandardAttributes(
+                email=cognito.StandardAttribute(
+                    required=True,
+                    mutable=True
+                )
+            ),
+            account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
+            removal_policy=RemovalPolicy.DESTROY  # Use RETAIN in production
+        )
+
+        # Create App Client
+        user_pool_client = user_pool.add_client(
+            "IpsUserPoolClient",
+            o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(
+                    authorization_code_grant=True,
+                    implicit_code_grant=True
+                ),
+                scopes=[cognito.OAuthScope.OPENID],
+                # callback_urls=["http://localhost:3000"]  # Update with your actual callback URL
+            )
+        )
+
+        # Create Cognito Authorizer
+        cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self, "IpsCognitoAuthorizer",
+            cognito_user_pools=[user_pool]
+        )
+
+        # The Upload and entry-point Lambda function
         id_upload_lambda = _lambda.Function(
             self,
             "IpsHandler",
@@ -137,7 +181,7 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_compress_lambda)
 
-        ## Commenting out the moderate Lambda function until a step function is introduced
+        # Commenting out the moderate Lambda function until a step function is introduced
         # id_moderate_lambda = _lambda.Function(
         #     self,
         #     "IpsHandlerModerate",
@@ -168,8 +212,8 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        ## Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
-        ## Commented out until moderation Lambda function is in a step function
+        # Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
+        # Commented out until moderation Lambda function is in a step function
         # id_moderate_lambda.add_to_role_policy(
         #     iam.PolicyStatement(
         #         effect=iam.Effect.ALLOW,
@@ -185,7 +229,7 @@ class IdPlusSelfieStack(Stack):
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
-                allow_headers=['Content-Type', 'X-Api-Key'],
+                allow_headers=['Content-Type', 'X-Api-Key', 'Authorization'],
                 allow_credentials=True
             )
         )
@@ -256,6 +300,8 @@ class IdPlusSelfieStack(Stack):
                 )
             ],
             api_key_required=True,
+            authorizer=cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
         # Compare Faces - Delete
@@ -269,7 +315,7 @@ class IdPlusSelfieStack(Stack):
                     status_code="200",
                     response_parameters={
                         'method.response.header.Access-Control-Allow-Origin': "'*'",
-                        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Api-Key'",
+                        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Api-Key,Authorization'",
                         'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,DELETE'",
                         'method.response.header.Access-Control-Allow-Credentials': "'true'"
                     }
@@ -312,21 +358,24 @@ class IdPlusSelfieStack(Stack):
                 )
             ],
             api_key_required=True,
+            authorizer=cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
         # S3 Event Notification - Compress
         upload_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_compress_lambda))
-        
-        ## S3 Event Notification - Moderate
-        ## Commented out until step functions are introduced
+
+        # S3 Event Notification - Moderate
+        # Commented out until step functions are introduced
         # upload_bucket.add_event_notification(
         #     s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_moderate_lambda))
 
         # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key, upload_bucket)
+        self.output_cfn_info(verification_table, api, api_key,
+                             upload_bucket, user_pool, user_pool_client)
 
-    def output_cfn_info(self, verification_table, api, api_key, upload_bucket):
+    def output_cfn_info(self, verification_table, api, api_key, upload_bucket, user_pool, user_pool_client):
         CfnOutput(
             self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
         )
@@ -345,7 +394,8 @@ class IdPlusSelfieStack(Stack):
         CfnOutput(self, "ApiEndpoint_compare-faces-delete",
                   value=f"{api.url}compare-faces-delete",
                   description="Endpoint for deletion of a previous comparison",
-                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces-delete"
+                  export_name=f"{
+                      self.stack_name}-ApiEndpoint-compare-faces-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",
@@ -368,3 +418,15 @@ class IdPlusSelfieStack(Stack):
 
         CfnOutput(self, "UploadBucketName", value=upload_bucket.bucket_name,
                   description="The name of the generated bucket")
+
+        CfnOutput(self, "UserPoolId",
+                  value=user_pool.user_pool_id,
+                  description="ID of the Cognito User Pool",
+                  export_name=f"{self.stack_name}-UserPoolId"
+                  )
+
+        CfnOutput(self, "UserPoolClientId",
+                  value=user_pool_client.user_pool_client_id,
+                  description="ID of the Cognito User Pool Client",
+                  export_name=f"{self.stack_name}-UserPoolClientId"
+                  )

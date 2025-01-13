@@ -2,7 +2,8 @@ import { useState } from "react";
 import axios from "axios";
 import "./App.css";
 import { Authenticator, useTheme, View, Image, Text, Heading, useAuthenticator, Button } from "@aws-amplify/ui-react";
-import { Amplify } from "aws-amplify";
+import { Amplify } from 'aws-amplify';
+import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 
 Amplify.configure({
   Auth: {
@@ -38,6 +39,9 @@ function App() {
     }
   
     try {
+      // Get the current authenticated session
+      const { tokens } = await fetchAuthSession();
+      const token = tokens.idToken.toString();
       const licenseBase64 = await convertToBase64(licenseFile);
       const selfieBase64 = await convertToBase64(selfieFile);
   
@@ -49,7 +53,8 @@ function App() {
         {
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': process.env.REACT_APP_API_KEY
+            'x-api-key': process.env.REACT_APP_API_KEY,
+            'Authorization': `Bearer ${token}`
           }
         }
       );
