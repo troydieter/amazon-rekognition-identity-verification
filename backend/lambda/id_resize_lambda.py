@@ -47,6 +47,16 @@ def upload_image(image, bucket, key):
     Uploads resized image to S3
     """
     buffer = BytesIO()
+    
+    # Convert to RGB if image is RGBA
+    if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+        background = Image.new('RGB', image.size, (255, 255, 255))
+        if image.mode == 'PA':
+            image = image.convert('RGBA')
+        background.paste(image, mask=image.split()[-1])  # -1 is the alpha channel
+        image = background
+
+    # Save as JPEG
     image.save(buffer, format='JPEG', optimize=True, quality=70)
     buffer.seek(0)
     logger.info(f"Uploading resized image to {bucket}/{key}")
