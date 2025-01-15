@@ -67,15 +67,15 @@ def get_email_content(verification_id, success, details):
                         <h2 class="success">✓ Verification Passed</h2>
                         <div class="details">
                             <div class="detail-row">
-                                <span class="label">Verification ID:</span>
+                                <span class="label">Verification ID: </span>
                                 <span class="value">{verification_id}</span>
                             </div>
                             <div class="detail-row">
-                                <span class="label">Timestamp:</span>
+                                <span class="label">Timestamp: </span>
                                 <span class="value">{timestamp}</span>
                             </div>
                             <div class="detail-row">
-                                <span class="label">Face Match:</span>
+                                <span class="label">Face Match: </span>
                                 <span class="value">{similarity}% match</span>
                             </div>
                         </div>
@@ -114,15 +114,15 @@ def get_email_content(verification_id, success, details):
                         <h2 class="failure">⚠ Verification Failed</h2>
                         <div class="details">
                             <div class="detail-row">
-                                <span class="label">Verification ID:</span>
+                                <span class="label">Verification ID: </span>
                                 <span class="value">{verification_id}</span>
                             </div>
                             <div class="detail-row">
-                                <span class="label">Timestamp:</span>
+                                <span class="label">Timestamp: </span>
                                 <span class="value">{timestamp}</span>
                             </div>
                             <div class="detail-row">
-                                <span class="label">Reason:</span>
+                                <span class="label">Reason: </span>
                                 <span class="value">{details.get('error', 'Verification requirements not met')}</span>
                             </div>
                         </div>
