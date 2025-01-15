@@ -344,16 +344,27 @@ class IdPlusSelfieStack(Stack):
             result_path="$.resize_result"  # Store result in this path
         )
 
-        send_email_task = stepfunctions_tasks.LambdaInvoke(
-            self, "SendEmailNotification",
+        send_success_email = stepfunctions_tasks.LambdaInvoke(
+            self, "SendSuccessEmail",
             lambda_function=send_email_lambda,
             payload=stepfunctions.TaskInput.from_object({
                 "verification_id.$": "$.verification_id",
-                "success.$": "$.success",
+                "success": True,
                 "user_email.$": "$.user_email",
                 "details.$": "$.details"
             })
-        )
+        ).next(success_state)
+
+        send_failure_email = stepfunctions_tasks.LambdaInvoke(
+            self, "SendFailureEmail",
+            lambda_function=send_email_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "success": False,
+                "user_email.$": "$.user_email",
+                "details.$": "$.details"
+            })
+        ).next(fail_state)
 
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
@@ -400,9 +411,9 @@ class IdPlusSelfieStack(Stack):
             self, "ResizeCheck"
         ).when(
             stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
-            success_email_flow  # Send success email before completing
+            send_success_email  # Send success email then go to success state
         ).otherwise(
-            failure_email_flow  # Send failure email before failing
+            send_failure_email  # Send failure email then go to fail state
         )
 
         compare_faces_task.next(comparison_choice)
