@@ -386,31 +386,31 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create choice states for each check
-        moderation_choice = stepfunctions.Choice(
-            self, "ModerationCheck"
+        resize_choice = stepfunctions.Choice(
+            self, "ResizeCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.moderation_result.Payload.success', True),
-            compare_faces_task  # If moderation passes, go to face comparison
+            stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
+            send_success_email
         ).otherwise(
-            fail_state
+            send_failure_email
         )
 
         comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
             stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
-            resize_task  # If comparison passes, go to resize
+            resize_task.next(resize_choice)
         ).otherwise(
-            fail_state
+            send_failure_email
         )
 
-        resize_choice = stepfunctions.Choice(
-            self, "ResizeCheck"
+        moderation_choice = stepfunctions.Choice(
+            self, "ModerationCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
-            send_success_email  # Send success email then go to success state
+            stepfunctions.Condition.boolean_equals('$.moderation_result.Payload.success', True),
+            compare_faces_task.next(comparison_choice)
         ).otherwise(
-            send_failure_email  # Send failure email then go to fail state
+            send_failure_email
         )
 
         compare_faces_task.next(comparison_choice)
@@ -422,8 +422,6 @@ class IdPlusSelfieStack(Stack):
             .next(process_verification)
             .next(moderate_task)
             .next(moderation_choice)
-            .next(comparison_choice)
-            .next(resize_choice)
         )
 
         # Create the state machine
