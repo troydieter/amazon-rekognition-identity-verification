@@ -4,61 +4,158 @@ import boto3
 import os
 from io import BytesIO
 import urllib.parse
+from decimal import Decimal
+from datetime import datetime, timezone
+import logging
+from urllib.parse import urlparse
 
+# Initialize clients
 s3_client = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
 
-def lambda_handler(event, context):
-    target_bucket_name = os.environ.get('S3_BUCKET_NAME')
-    if not target_bucket_name:
-        raise ValueError("Target bucket name is not set in environment variables.")
-    
-    try:
-        record = event['Records'][0]['s3']
-        bucket_name = record['bucket']['name']
-        object_key = urllib.parse.unquote_plus(record['object']['key'])
-        
-        print(f"Processing object: {object_key} from bucket: {bucket_name}")
-        
-        if object_key.startswith("resized_"):
-            print(f"Object {object_key} is already resized. Skipping processing.")
-            return create_response(200, 'Object already resized')
+# Set up logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-        image_data = fetch_image(bucket_name, object_key)
-        resized_image = resize_image(image_data)
-        new_object_key = f"resized_{object_key}"
-        upload_image(resized_image, target_bucket_name, new_object_key)
-
-        return create_response(200, 'Compression Complete!')
-
-    except s3_client.exceptions.NoSuchKey:
-        print(f"Error: The object key '{object_key}' does not exist in the bucket '{bucket_name}'")
-        return create_response(404, 'Object not found')
-    except Exception as e:
-        print(f"Error processing object {object_key} from bucket {bucket_name}: {str(e)}")
-        return create_response(500, 'Internal server error')
+def get_s3_key_from_uri(s3_uri):
+    """
+    Extracts the S3 key from a full S3 URI
+    """
+    parsed = urlparse(s3_uri)
+    return parsed.path.lstrip('/')
 
 def fetch_image(bucket, key):
-    print(f"Fetching object: {key} from bucket: {bucket}")
+    """
+    Fetches image from S3
+    """
+    logger.info(f"Fetching object: {key} from bucket: {bucket}")
     response = s3_client.get_object(Bucket=bucket, Key=key)
     return response['Body'].read()
 
 def resize_image(image_data):
+    """
+    Resizes the image to half its original size
+    """
     image = Image.open(BytesIO(image_data))
     width, height = image.size
     resized = image.resize((width // 2, height // 2))
-    print(f"Resized image from {width}x{height} to {width // 2}x{height // 2}")
+    logger.info(f"Resized image from {width}x{height} to {width//2}x{height//2}")
     return resized
 
 def upload_image(image, bucket, key):
+    """
+    Uploads resized image to S3
+    """
     buffer = BytesIO()
     image.save(buffer, format='JPEG', optimize=True, quality=70)
     buffer.seek(0)
-    print(f"Uploading resized image to {bucket}/{key}")
+    logger.info(f"Uploading resized image to {bucket}/{key}")
     response = s3_client.put_object(Bucket=bucket, Key=key, Body=buffer)
-    print(f"PutObject response: {response}")
+    logger.info(f"PutObject response: {response}")
+    return f"s3://{bucket}/{key}"
 
-def create_response(status_code, message):
-    return {
-        'statusCode': status_code,
-        'body': json.dumps(message)
-    }
+def update_dynamodb_record(verification_id, resized_paths):
+    """
+    Updates the DynamoDB record with resized image paths
+    """
+    try:
+        table = dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
+        
+        # Query to get the item's Timestamp
+        response = table.query(
+            KeyConditionExpression='VerificationId = :vid',
+            ExpressionAttributeValues={
+                ':vid': verification_id
+            },
+            ScanIndexForward=False,
+            Limit=1
+        )
+        
+        if not response['Items']:
+            raise Exception(f"No record found for verification ID: {verification_id}")
+            
+        timestamp = response['Items'][0]['Timestamp']
+        current_time = Decimal(str(datetime.now(timezone.utc).timestamp()))
+        
+        # Update DynamoDB with resized image paths
+        update_expression = """
+            SET ResizedDLImageS3Key = :dl_resized,
+                ResizedSelfieImageS3Key = :selfie_resized,
+                LastUpdated = :updated,
+                ResizedAt = :resized_at
+        """
+        
+        expression_values = {
+            ':dl_resized': resized_paths['dl'],
+            ':selfie_resized': resized_paths['selfie'],
+            ':updated': current_time,
+            ':resized_at': current_time
+        }
+        
+        table.update_item(
+            Key={
+                'VerificationId': verification_id,
+                'Timestamp': timestamp
+            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_values
+        )
+        
+        logger.info(f"Updated DynamoDB record for verification ID: {verification_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error updating DynamoDB: {str(e)}")
+        raise
+
+def lambda_handler(event, context):
+    """
+    AWS Lambda handler for resizing images as part of Step Functions workflow
+    """
+    try:
+        logger.info(f"Received event: {json.dumps(event)}")
+        
+        verification_id = event['verification_id']
+        bucket_name = os.environ.get('S3_BUCKET_NAME')
+        
+        if not bucket_name:
+            raise ValueError("S3_BUCKET_NAME environment variable is not set.")
+        
+        # Extract S3 keys from full URIs
+        dl_key = get_s3_key_from_uri(event['dl_key'])
+        selfie_key = get_s3_key_from_uri(event['selfie_key'])
+        
+        # Process DL image
+        dl_image_data = fetch_image(bucket_name, dl_key)
+        resized_dl = resize_image(dl_image_data)
+        resized_dl_key = f"resized_{dl_key}"
+        resized_dl_path = upload_image(resized_dl, bucket_name, resized_dl_key)
+        
+        # Process Selfie image
+        selfie_image_data = fetch_image(bucket_name, selfie_key)
+        resized_selfie = resize_image(selfie_image_data)
+        resized_selfie_key = f"resized_{selfie_key}"
+        resized_selfie_path = upload_image(resized_selfie, bucket_name, resized_selfie_key)
+        
+        # Update DynamoDB with resized image paths
+        resized_paths = {
+            'dl': resized_dl_path,
+            'selfie': resized_selfie_path
+        }
+        update_dynamodb_record(verification_id, resized_paths)
+        
+        return {
+            'statusCode': 200,
+            'verification_id': verification_id,
+            'success': True,
+            'resized_paths': resized_paths
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing resize operation: {str(e)}")
+        return {
+            'statusCode': 500,
+            'verification_id': verification_id if 'verification_id' in locals() else 'UNKNOWN',
+            'success': False,
+            'error': str(e)
+        }
