@@ -9,6 +9,8 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_s3_notifications as s3n,
     aws_cognito as cognito,
+    aws_stepfunctions as stepfunctions,
+    aws_stepfunctions_tasks as stepfunctions_tasks,
     RemovalPolicy,
     CfnOutput,
 )
@@ -113,21 +115,30 @@ class IdPlusSelfieStack(Stack):
                     authorization_code_grant=True,
                     implicit_code_grant=True
                 ),
-                scopes=[cognito.OAuthScope.OPENID],
-                # callback_urls=["http://localhost:3000"]  # Update with your actual callback URL
+                scopes=[
+                    cognito.OAuthScope.OPENID,
+                    cognito.OAuthScope.EMAIL,
+                    cognito.OAuthScope.PROFILE
+                ],
+                # callback_urls=["http://localhost:3000"]
+            ),
+            read_attributes=cognito.ClientAttributes()
+            .with_standard_attributes(
+                email=True
             )
         )
 
         # Create Cognito Authorizer
         cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
             self, "IpsCognitoAuthorizer",
-            cognito_user_pools=[user_pool]
+            cognito_user_pools=[user_pool],
+            identity_source="method.request.header.Authorization"
         )
 
         # The Upload and entry-point Lambda function
         id_upload_lambda = _lambda.Function(
             self,
-            "IpsHandler",
+            "IDHandlerUpload",
             code=_lambda.Code.from_asset("lambda"),
             handler="id_upload_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
@@ -144,9 +155,186 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_upload_lambda)
 
+        # Create the beginning Lambda for the SM
+        id_trigger_stepfunction_lambda = _lambda.Function(
+            self,
+            "IDHandlerTriggerStepFunction",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_trigger_stepfunction_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(6),
+            environment={
+                "LOG_LEVEL": "INFO",
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+
+        # Create success end state
+        success_state = stepfunctions.Succeed(
+            self, "SucceedState",
+            comment="Verification process completed successfully"
+        )
+
+        # Create fail end state
+        fail_state = stepfunctions.Fail(
+            self, "FailState",
+            cause="Verification process failed",
+            error="VerificationError"
+        )
+
+        id_sm_update_status_lambda = _lambda.Function(
+            self,
+            "UpdateStatusLambda",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_sm_update_status_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            environment={
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            }
+        )
+
+        verification_table.grant_read_write_data(id_sm_update_status_lambda)
+
+        # Create the initial state for the state machine
+        initial_state = stepfunctions.Pass(
+            self, "InitialState",
+            parameters={  # Use parameters instead of result
+                "status": "STARTED",
+                "timestamp.$": "$$.Execution.StartTime",
+                "verification_id.$": "$.verification_id",
+                "user_email.$": "$.user_email",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "success": True
+            }
+        )
+
+        # Create task states that update status
+        update_processing = stepfunctions_tasks.LambdaInvoke(
+            self, "UpdateProcessingStatus",
+            lambda_function=id_sm_update_status_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "status": "PROCESSING",
+                "timestamp.$": "$$.Execution.StartTime"
+            })
+        )
+
+        update_complete = stepfunctions_tasks.LambdaInvoke(
+            self, "UpdateCompleteStatus",
+            lambda_function=id_sm_update_status_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "status": "COMPLETED",
+                "timestamp.$": "$$.Execution.StartTime"
+            })
+        )
+
+        # Grant permissions
+        upload_bucket.grant_read(id_trigger_stepfunction_lambda)
+        verification_table.grant_read_write_data(
+            id_trigger_stepfunction_lambda)
+
+        # Create the verification process state
+        verification_process = stepfunctions.Pass(
+            self, "ProcessVerification",
+            parameters={  # Use parameters instead of result
+                "status": "PROCESSING",
+                "timestamp.$": "$$.Execution.StartTime",
+                "verification_id.$": "$.verification_id",
+                "user_email.$": "$.user_email",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "success": True
+            }
+        )
+
+        # Create choice state
+        choice_state = stepfunctions.Choice(
+            self, "VerificationChoice"
+        ).when(
+            stepfunctions.Condition.boolean_equals('$.success', True),
+            success_state
+        ).otherwise(
+            fail_state
+        )
+        # Define the chain
+        chain = (
+            initial_state
+            .next(update_processing)
+            .next(verification_process)
+            .next(choice_state.when(
+                stepfunctions.Condition.boolean_equals('$.success', True),
+                update_complete.next(success_state)
+            ).otherwise(
+                fail_state)
+            )
+        )
+
+        # Create the state machine
+        sm = stepfunctions.StateMachine(
+            self, "StateMachine",
+            definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
+            timeout=Duration.minutes(5),
+            tracing_enabled=True,
+            logs=stepfunctions.LogOptions(
+                destination=logs.LogGroup(
+                    self,
+                    "StateMachineLogGroup",
+                    retention=logs.RetentionDays.ONE_WEEK
+                ),
+                level=stepfunctions.LogLevel.ALL
+            )
+        )
+
+        sm.grant_start_execution(id_trigger_stepfunction_lambda)
+        # Add state machine ARN to Lambda environment
+        id_trigger_stepfunction_lambda.add_environment(
+            "STATE_MACHINE_ARN",
+            sm.state_machine_arn
+        )
+
+        # Add CloudWatch logging permissions
+        sm.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "logs:CreateLogDelivery",
+                    "logs:GetLogDelivery",
+                    "logs:UpdateLogDelivery",
+                    "logs:DeleteLogDelivery",
+                    "logs:ListLogDeliveries",
+                    "logs:PutResourcePolicy",
+                    "logs:DescribeResourcePolicies",
+                    "logs:DescribeLogGroups"
+                ],
+                resources=["*"]
+            )
+        )
+
+        # Add S3 notifications
+        upload_bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED_PUT,
+            s3n.LambdaDestination(id_trigger_stepfunction_lambda),
+            s3.NotificationKeyFilter(
+                prefix="dl/"
+            )
+        )
+
+        upload_bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED_PUT,
+            s3n.LambdaDestination(id_trigger_stepfunction_lambda),
+            s3.NotificationKeyFilter(
+                prefix="selfie/"
+            )
+        )
+
         id_delete_lambda = _lambda.Function(
             self,
-            "IpsHandlerDelete",
+            "IDHandlerDelete",
             code=_lambda.Code.from_asset("lambda"),
             handler="id_delete_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
@@ -165,7 +353,7 @@ class IdPlusSelfieStack(Stack):
 
         id_compress_lambda = _lambda.Function(
             self,
-            "IpsHandlerCompress",
+            "IDHandlerCompress",
             code=_lambda.Code.from_asset("lambda"),
             handler="id_compress_lambda.lambda_handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
@@ -227,10 +415,14 @@ class IdPlusSelfieStack(Stack):
             self,
             "CompareApi",
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=apigateway.Cors.ALL_METHODS,
-                allow_headers=['Content-Type', 'X-Api-Key', 'Authorization'],
-                allow_credentials=True
+                allow_origins=["*"],
+                allow_methods=["POST", "OPTIONS"],
+                allow_headers=[
+                    "Content-Type",
+                    "X-Api-Key",
+                    "Authorization"
+                ],
+                max_age=Duration.days(1)
             )
         )
 
@@ -270,30 +462,45 @@ class IdPlusSelfieStack(Stack):
             ).to_string(),
         )
 
-        # Compare Faces - Create
-        compare_faces_resource_create = api.root.add_resource("compare-faces")
-        compare_faces_integration_create = apigateway.LambdaIntegration(
-            id_upload_lambda,
-            proxy=False,
-            integration_responses=[
-                apigateway.IntegrationResponse(
-                    status_code="200",
-                    response_parameters={
-                        'method.response.header.Access-Control-Allow-Origin': "'*'"
-                    }
-                )
-            ],
-            request_templates={
-                "application/json": '{"body": $input.json("$")}'
+        success_response = apigateway.IntegrationResponse(
+            status_code="200",
+            response_parameters={
+                'method.response.header.Access-Control-Allow-Origin': "'*'",
+                'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Api-Key,Authorization'",
+                'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,POST'"
             }
         )
 
-        compare_faces_resource_create.add_method(
+        error_response = apigateway.IntegrationResponse(
+            status_code="401",
+            selection_pattern=".*[UNAUTHORIZED].*",
+            response_parameters={
+                'method.response.header.Access-Control-Allow-Origin': "'*'"
+            }
+        )
+
+        # Compare Faces - Create
+        id_upload_integration = apigateway.LambdaIntegration(
+            id_upload_lambda,
+            proxy=True,
+            integration_responses=[success_response, error_response]
+        )
+
+        compare_faces_resource = api.root.add_resource("id-verify")
+        compare_faces_resource.add_method(
             "POST",
-            compare_faces_integration_create,
+            id_upload_integration,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",
+                    response_parameters={
+                        'method.response.header.Access-Control-Allow-Origin': True,
+                        'method.response.header.Access-Control-Allow-Headers': True,
+                        'method.response.header.Access-Control-Allow-Methods': True
+                    }
+                ),
+                apigateway.MethodResponse(
+                    status_code="401",
                     response_parameters={
                         'method.response.header.Access-Control-Allow-Origin': True
                     }
@@ -304,10 +511,17 @@ class IdPlusSelfieStack(Stack):
             authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
-        # Compare Faces - Delete
-        compare_faces_resource_delete = api.root.add_resource(
-            "compare-faces-delete")
-        compare_faces_integration_delete = apigateway.LambdaIntegration(
+        id_upload_lambda.add_permission(
+            "APIGatewayInvoke",
+            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=api.arn_for_execute_api()
+        )
+
+        # ID Verification - Delete
+        id_verify_resource_delete = api.root.add_resource(
+            "id-verify-delete")
+        id_verify_integration_delete = apigateway.LambdaIntegration(
             id_delete_lambda,
             proxy=False,
             integration_responses=[
@@ -343,9 +557,9 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
-        compare_faces_resource_delete.add_method(
+        id_verify_resource_delete.add_method(
             "DELETE",
-            compare_faces_integration_delete,
+            id_verify_integration_delete,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",
@@ -362,15 +576,6 @@ class IdPlusSelfieStack(Stack):
             authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
-        # S3 Event Notification - Compress
-        upload_bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_compress_lambda))
-
-        # S3 Event Notification - Moderate
-        # Commented out until step functions are introduced
-        # upload_bucket.add_event_notification(
-        #     s3.EventType.OBJECT_CREATED_PUT, s3n.LambdaDestination(id_moderate_lambda))
-
         # Outputs to assist debugging and deployment
         self.output_cfn_info(verification_table, api, api_key,
                              upload_bucket, user_pool, user_pool_client)
@@ -385,17 +590,17 @@ class IdPlusSelfieStack(Stack):
                   export_name=f"{self.stack_name}-ApiUrl"
                   )
 
-        CfnOutput(self, "ApiEndpoint_compare-faces",
-                  value=f"{api.url}compare-faces",
+        CfnOutput(self, "ApiEndpoint_id-verify",
+                  value=f"{api.url}id-verify",
                   description="Endpoint for face comparison",
-                  export_name=f"{self.stack_name}-ApiEndpoint-compare-faces"
+                  export_name=f"{self.stack_name}-ApiEndpoint-id-verify"
                   )
 
-        CfnOutput(self, "ApiEndpoint_compare-faces-delete",
-                  value=f"{api.url}compare-faces-delete",
+        CfnOutput(self, "ApiEndpoint_id-verify-delete",
+                  value=f"{api.url}id-verify-delete",
                   description="Endpoint for deletion of a previous comparison",
                   export_name=f"{
-                      self.stack_name}-ApiEndpoint-compare-faces-delete"
+                      self.stack_name}-ApiEndpoint-id-verify-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",

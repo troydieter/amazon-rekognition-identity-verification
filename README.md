@@ -18,7 +18,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 ## Architecture
 
 ### AWS Solution Architecture
-#### /compare-faces
+#### /id-verify
 ![Visual AWS Architecture](./docs/diagram01.png)
 1. User uploads files (ID + Selfie) to the system.
 2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
@@ -28,7 +28,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 6. The Rekognition response is stored in a DynamoDB table with the `VerificationId` attribute in the item. The object is also stored in Amazon S3 for post-processing. (see: the purple boxes shown to the right)
 7. Amazon Rekognition processes the images and returns a response (box at the bottom).
 
-#### /compare-faces-delete
+#### /id-verify-delete
 ![Visual AWS Architecture](./docs/diagram02.png)
 1. Admin user receives a request to delete an identity that has been verified. They retrieve the `VerificationId` value as initially registered by the user.
 2. A `DELETE` API call is made to API Gateway with `VerificationId` as a parameter and the necessary `x-api-key` value in the header.
@@ -36,7 +36,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 4. CloudWatch Logs record the Lambda function's execution details.
 5. The item in the DynamoDB table, based on the primary key `VerificationId` is deleted along with the Amazon S3 objects (one of each). The response is sent back via the API call that it has been deleted successfully.
 
-#### /compare-faces-resizing
+#### /id-verify-resizing
 ![Visual AWS Architecture](./docs/diagram03.png)
 1. The drivers license (ID) and selfie are uploaded.
 2. CloudWatch Logs record the Lambda function's execution details. The `eventSourceMapping` for Amazon S3 objects occurs, invoking the function.
@@ -88,12 +88,13 @@ Before you begin, ensure you have the following installed:
      ```
      cp .env.example.env .env
      ```
-   - Open the `.env` file and replace the placeholder values with your actual AWS credentials and S3 bucket information:
+   - Open the `.env` file and replace the placeholder values with your API Gateway URL, API Key and Cognito Userpool ClientID, ID and AWS region.
      ```
       REACT_APP_API_URL=https://example.execute-api.REGION.amazonaws.com/prod
       REACT_APP_API_KEY=xyz123
       REACT_APP_USERPOOL_CLIENTID=example123
       REACT_APP_USERPOOL_ID=us-east-1_example
+      REACT_APP_REGION=us-east-1
       ```
 
 4. Build it:
