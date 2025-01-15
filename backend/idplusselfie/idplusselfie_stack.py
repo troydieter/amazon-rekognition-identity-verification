@@ -411,13 +411,12 @@ class IdPlusSelfieStack(Stack):
         )
 
         comparison_choice = stepfunctions.Choice(
-            self, "ComparisonCheck"
+        self, "ComparisonCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals(
-                '$.comparison_result.Payload.success', True),
-            resize_task.next(resize_choice)
+            stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
+            resize_task
         ).otherwise(
-            send_failure_email
+            send_failure_email  # Check if this is causing duplicate emails
         )
 
         moderation_choice = stepfunctions.Choice(
@@ -425,7 +424,7 @@ class IdPlusSelfieStack(Stack):
         ).when(
             stepfunctions.Condition.boolean_equals(
                 '$.moderation_result.Payload.success', True),
-            compare_faces_task.next(comparison_choice)
+            compare_faces_task
         ).otherwise(
             send_failure_email
         )
