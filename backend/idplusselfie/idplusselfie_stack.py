@@ -359,7 +359,8 @@ class IdPlusSelfieStack(Stack):
                     "moderation_results.$": "$.moderation_result.Payload.moderation_results",
                     "resized_paths.$": "$.resize_result.Payload.resized_paths"
                 }
-            })
+            }),
+            retry_on_service_exceptions=False
         ).next(success_state)
 
         send_failure_email = stepfunctions_tasks.LambdaInvoke(
@@ -411,12 +412,13 @@ class IdPlusSelfieStack(Stack):
         )
 
         comparison_choice = stepfunctions.Choice(
-        self, "ComparisonCheck"
+            self, "ComparisonCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
-            resize_task
+            stepfunctions.Condition.boolean_equals(
+                '$.comparison_result.Payload.success', True),
+            resize_task.next(resize_choice)
         ).otherwise(
-            send_failure_email  # Check if this is causing duplicate emails
+            send_failure_email
         )
 
         moderation_choice = stepfunctions.Choice(
@@ -424,7 +426,7 @@ class IdPlusSelfieStack(Stack):
         ).when(
             stepfunctions.Condition.boolean_equals(
                 '$.moderation_result.Payload.success', True),
-            compare_faces_task
+            compare_faces_task.next(comparison_choice)
         ).otherwise(
             send_failure_email
         )
