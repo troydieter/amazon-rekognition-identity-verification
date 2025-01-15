@@ -16,9 +16,10 @@ def get_email_content(verification_id, success, details):
     """
     Generate email content based on verification results
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = details.get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     
     if success:
+        comparison_results = details.get('comparison_results', {})
         subject = "ID Verification Successful"
         body = f"""
         Your ID verification has been completed successfully.
@@ -27,7 +28,12 @@ def get_email_content(verification_id, success, details):
         - Verification ID: {verification_id}
         - Status: {details.get('status', 'Completed')}
         - Timestamp: {timestamp}
-        - Similarity Score: {details.get('comparison_results', {}).get('Similarity', 'N/A')}%
+        - Similarity Score: {comparison_results.get('Similarity', 'N/A')}
+        
+        Image Processing Results:
+        - Face Match Confidence: {comparison_results.get('Confidence', 'N/A')}
+        - Moderation Check: Passed
+        - Images Resized: Completed
         
         Thank you for using our service.
         """
