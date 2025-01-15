@@ -104,11 +104,18 @@ def compare_faces(source_key, target_key, bucket):
         
         if response.get('FaceMatches'):
             face_match = response['FaceMatches'][0]  # Get the best match
+            bounding_box = face_match['Face']['BoundingBox']
+            
             return {
                 'Matched': True,
-                'Similarity': Decimal(str(face_match['Similarity'])),
-                'BoundingBox': face_match['Face']['BoundingBox'],
-                'Confidence': Decimal(str(face_match['Face']['Confidence']))
+                'Similarity': Decimal(str(face_match['Similarity'])).quantize(Decimal('.01')),
+                'BoundingBox': {
+                    'Width': Decimal(str(bounding_box['Width'])).quantize(Decimal('.001')),
+                    'Height': Decimal(str(bounding_box['Height'])).quantize(Decimal('.001')),
+                    'Left': Decimal(str(bounding_box['Left'])).quantize(Decimal('.001')),
+                    'Top': Decimal(str(bounding_box['Top'])).quantize(Decimal('.001'))
+                },
+                'Confidence': Decimal(str(face_match['Face']['Confidence'])).quantize(Decimal('.01'))
             }
         else:
             return {
@@ -141,12 +148,28 @@ def lambda_handler(event, context):
         # Perform face comparison
         comparison_results = compare_faces(dl_key, selfie_key, bucket_name)
         
-        # Determine success based on match results
-        success = comparison_results.get('Matched', False)
+        # Determine success based on match results and minimum similarity threshold
+        min_similarity_threshold = Decimal('80')  # 80% similarity threshold
+        current_similarity = comparison_results.get('Similarity', Decimal('0'))
+        success = comparison_results.get('Matched', False) and current_similarity >= min_similarity_threshold
+        
         final_status = "FACE_MATCH_SUCCESSFUL" if success else "FACE_MATCH_FAILED"
         
         # Update final status with comparison results
         update_status(verification_id, final_status, comparison_results)
+        
+        # Convert Decimal to string for JSON serialization
+        response_results = {
+            'Matched': comparison_results['Matched'],
+            'Similarity': str(comparison_results['Similarity']),
+            'Message': comparison_results.get('Message', 'Face comparison completed')
+        }
+        
+        if 'BoundingBox' in comparison_results:
+            response_results['BoundingBox'] = {
+                k: str(v) for k, v in comparison_results['BoundingBox'].items()
+            }
+            response_results['Confidence'] = str(comparison_results['Confidence'])
         
         return {
             'statusCode': 200,
@@ -156,7 +179,7 @@ def lambda_handler(event, context):
                 'verification_id': verification_id,
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'status': final_status,
-                'comparison_results': comparison_results
+                'comparison_results': response_results
             }
         }
         
@@ -176,3 +199,4 @@ def lambda_handler(event, context):
             'success': False,
             'error': str(e)
         }
+
