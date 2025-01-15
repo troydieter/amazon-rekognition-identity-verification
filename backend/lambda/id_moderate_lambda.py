@@ -1,9 +1,10 @@
 import boto3
 import json
 import os
-from decimal import Decimal
 import logging
+from decimal import Decimal
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 # Initialize clients
 rekognition_client = boto3.client('rekognition')
@@ -13,12 +14,21 @@ dynamodb = boto3.resource('dynamodb')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+def get_s3_key_from_uri(s3_uri):
+    """
+    Extracts the S3 key from a full S3 URI
+    Example: "s3://bucket-name/path/to/file.jpg" -> "path/to/file.jpg"
+    """
+    parsed = urlparse(s3_uri)
+    return parsed.path.lstrip('/')
+
 def moderate_image(photo, bucket):
     """
     Uses Amazon Rekognition to detect moderation labels in the given image.
     Returns a dictionary with label names and their confidence scores.
     """
     try:
+        logger.info(f"Moderating image: bucket={bucket}, key={photo}")
         response = rekognition_client.detect_moderation_labels(
             Image={'S3Object': {'Bucket': bucket, 'Name': photo}}
         )
@@ -58,11 +68,9 @@ def update_dynamodb_record(verification_id, moderation_results):
         if not response['Items']:
             raise Exception(f"No record found for verification ID: {verification_id}")
             
-        # Get the Timestamp from the existing record
         timestamp = response['Items'][0]['Timestamp']
         current_time = Decimal(str(datetime.now(timezone.utc).timestamp()))
         
-        # Update DynamoDB with moderation results
         update_expression = """
             SET ModerationLabels = :labels,
                 ModerationStatus = :status,
@@ -100,14 +108,18 @@ def lambda_handler(event, context):
     try:
         logger.info(f"Received event: {json.dumps(event)}")
         
-        # Get parameters from Step Functions input
         verification_id = event['verification_id']
-        dl_key = event['dl_key'].split('/')[-1]  # Extract key from full S3 path
-        selfie_key = event['selfie_key'].split('/')[-1]  # Extract key from full S3 path
-        
         bucket_name = os.environ.get('S3_BUCKET_NAME')
+        
         if not bucket_name:
             raise ValueError("S3_BUCKET_NAME environment variable is not set.")
+        
+        # Extract S3 keys from full URIs
+        dl_key = get_s3_key_from_uri(event['dl_key'])
+        selfie_key = get_s3_key_from_uri(event['selfie_key'])
+        
+        logger.info(f"Processing DL image: {dl_key}")
+        logger.info(f"Processing Selfie image: {selfie_key}")
         
         # Process both images
         dl_moderation = moderate_image(dl_key, bucket_name)
@@ -126,7 +138,6 @@ def lambda_handler(event, context):
         update_dynamodb_record(verification_id, moderation_results)
         
         # Determine if any concerning labels were found
-        # You can customize this logic based on your requirements
         concerning_labels = any(
             label['Confidence'] > 80 
             for labels in [dl_moderation, selfie_moderation] 
@@ -136,7 +147,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'verification_id': verification_id,
-            'success': not concerning_labels,  # False if concerning labels found
+            'success': not concerning_labels,
             'moderation_results': moderation_results
         }
         
