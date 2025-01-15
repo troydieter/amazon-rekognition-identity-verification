@@ -56,7 +56,7 @@ def upload_image(image, bucket, key):
 
 def update_dynamodb_record(verification_id, resized_paths):
     """
-    Updates the DynamoDB record with resized image paths
+    Updates the DynamoDB record with resized image paths and final status
     """
     try:
         table = dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
@@ -77,19 +77,25 @@ def update_dynamodb_record(verification_id, resized_paths):
         timestamp = response['Items'][0]['Timestamp']
         current_time = Decimal(str(datetime.now(timezone.utc).timestamp()))
         
-        # Update DynamoDB with resized image paths
+        # Update DynamoDB with resized image paths and final status
         update_expression = """
             SET ResizedDLImageS3Key = :dl_resized,
                 ResizedSelfieImageS3Key = :selfie_resized,
                 LastUpdated = :updated,
-                ResizedAt = :resized_at
+                ResizedAt = :resized_at,
+                StateMachineStatus = :status,
+                ProcessingCompleted = :completed_at,
+                Status = :verification_status
         """
         
         expression_values = {
             ':dl_resized': resized_paths['dl'],
             ':selfie_resized': resized_paths['selfie'],
             ':updated': current_time,
-            ':resized_at': current_time
+            ':resized_at': current_time,
+            ':status': 'COMPLETED_SUCCESSFUL',
+            ':completed_at': current_time,
+            ':verification_status': 'VERIFIED'  # Or whatever final status you want
         }
         
         table.update_item(
@@ -101,11 +107,84 @@ def update_dynamodb_record(verification_id, resized_paths):
             ExpressionAttributeValues=expression_values
         )
         
-        logger.info(f"Updated DynamoDB record for verification ID: {verification_id}")
+        logger.info(f"Updated DynamoDB record for verification ID: {verification_id} - Status: COMPLETED_SUCCESSFUL")
         return True
         
     except Exception as e:
         logger.error(f"Error updating DynamoDB: {str(e)}")
+        raise
+
+def update_failed_status(verification_id, error_message):
+    """
+    Updates DynamoDB record with failed status
+    """
+    try:
+        table = dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
+        
+        # Query to get the item's Timestamp
+        response = table.query(
+            KeyConditionExpression='VerificationId = :vid',
+            ExpressionAttributeValues={
+                ':vid': verification_id
+            },
+            ScanIndexForward=False,
+            Limit=1
+        )
+        
+        if not response['Items']:
+            raise Exception(f"No record found for verification ID: {verification_id}")
+            
+        timestamp = response['Items'][0]['Timestamp']
+        current_time = Decimal(str(datetime.now(timezone.utc).timestamp()))
+        
+        table.update_item(
+            Key={
+                'VerificationId': verification_id,
+                'Timestamp': timestamp
+            },
+            UpdateExpression="""
+                SET StateMachineStatus = :status,
+                    LastUpdated = :updated,
+                    ErrorMessage = :error,
+                    Status = :verification_status
+            """,
+            ExpressionAttributeValues={
+                ':status': 'COMPLETED_FAILED',
+                ':updated': current_time,
+                ':error': error_message,
+                ':verification_status': 'FAILED'
+            }
+        )
+        
+        logger.info(f"Updated DynamoDB record for verification ID: {verification_id} - Status: COMPLETED_FAILED")
+        
+    except Exception as e:
+        logger.error(f"Error updating failed status in DynamoDB: {str(e)}")
+
+def validate_image(image_data):
+    """
+    Validates image size and format
+    """
+    try:
+        image = Image.open(BytesIO(image_data))
+        
+        # Check image format
+        if image.format not in ['JPEG', 'JPG', 'PNG']:
+            raise ValueError(f"Unsupported image format: {image.format}")
+        
+        # Check image size (e.g., max 10MB)
+        if len(image_data) > 10 * 1024 * 1024:
+            raise ValueError("Image size exceeds 10MB limit")
+        
+        # Check dimensions (e.g., max 4000x4000)
+        width, height = image.size
+        if width > 4000 or height > 4000:
+            raise ValueError(f"Image dimensions ({width}x{height}) exceed maximum allowed (4000x4000)")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Image validation failed: {str(e)}")
         raise
 
 def lambda_handler(event, context):
@@ -127,12 +206,14 @@ def lambda_handler(event, context):
         
         # Process DL image
         dl_image_data = fetch_image(bucket_name, dl_key)
+        validate_image(dl_image_data)
         resized_dl = resize_image(dl_image_data)
         resized_dl_key = f"resized_{dl_key}"
         resized_dl_path = upload_image(resized_dl, bucket_name, resized_dl_key)
         
         # Process Selfie image
         selfie_image_data = fetch_image(bucket_name, selfie_key)
+        validate_image(selfie_image_data)
         resized_selfie = resize_image(selfie_image_data)
         resized_selfie_key = f"resized_{selfie_key}"
         resized_selfie_path = upload_image(resized_selfie, bucket_name, resized_selfie_key)
@@ -152,10 +233,15 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        logger.error(f"Error processing resize operation: {str(e)}")
+        error_message = str(e)
+        logger.error(f"Error processing resize operation: {error_message}")
+        
+        if 'verification_id' in locals():
+            update_failed_status(verification_id, error_message)
+            
         return {
             'statusCode': 500,
             'verification_id': verification_id if 'verification_id' in locals() else 'UNKNOWN',
             'success': False,
-            'error': str(e)
+            'error': error_message
         }

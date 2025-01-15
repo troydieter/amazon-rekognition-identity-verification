@@ -65,7 +65,7 @@ def lambda_handler(event, context):
         # Do the face comparison rekognition work here...
         
         # Update final status
-        update_status(verification_id, "FACE_COMPARISON_COMPLETE")
+        update_status(verification_id, "SUCCESSFUL_FACIAL_COMPARISON_COMPLETED")
         
         return {
             'statusCode': 200,
@@ -73,7 +73,7 @@ def lambda_handler(event, context):
             'details': {
                 'verification_id': verification_id,
                 'timestamp': datetime.now(timezone.utc).isoformat(),
-                'status': "FACE_COMPARISON_COMPLETE"
+                'status': "SUCCESSFUL_FACIAL_COMPARISON_COMPLETED"
             }
         }
         
