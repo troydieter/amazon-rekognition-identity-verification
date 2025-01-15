@@ -201,15 +201,15 @@ class IdPlusSelfieStack(Stack):
         # Create the initial state for the state machine
         initial_state = stepfunctions.Pass(
             self, "InitialState",
-            result=stepfunctions.Result.from_object({
+            parameters={  # Use parameters instead of result
                 "status": "STARTED",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
                 "user_email.$": "$.user_email",
                 "dl_key.$": "$.dl_key",
                 "selfie_key.$": "$.selfie_key",
-                "success": True  # Explicitly set success
-            })
+                "success": True
+            }
         )
 
         # Create task states that update status
@@ -241,15 +241,15 @@ class IdPlusSelfieStack(Stack):
         # Create the verification process state
         verification_process = stepfunctions.Pass(
             self, "ProcessVerification",
-            result=stepfunctions.Result.from_object({
+            parameters={  # Use parameters instead of result
                 "status": "PROCESSING",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
                 "user_email.$": "$.user_email",
                 "dl_key.$": "$.dl_key",
                 "selfie_key.$": "$.selfie_key",
-                "success": True  # Explicitly set success
-            })
+                "success": True
+            }
         )
 
         # Create choice state
@@ -264,8 +264,14 @@ class IdPlusSelfieStack(Stack):
         # Define the chain
         chain = (
             initial_state
+            .next(update_processing)
             .next(verification_process)
-            .next(choice_state)
+            .next(choice_state.when(
+                stepfunctions.Condition.boolean_equals('$.success', True),
+                update_complete.next(success_state)
+            ).otherwise(
+                fail_state)
+            )
         )
 
         # Create the state machine
