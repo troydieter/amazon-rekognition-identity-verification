@@ -351,7 +351,14 @@ class IdPlusSelfieStack(Stack):
                 "verification_id.$": "$.verification_id",
                 "success": True,
                 "user_email.$": "$.user_email",
-                "details.$": "$.details"
+                "details": {
+                    "verification_id.$": "$.verification_id",
+                    "status.$": "$.status",
+                    "timestamp.$": "$.timestamp",
+                    "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
+                    "moderation_results.$": "$.moderation_result.Payload.moderation_results",
+                    "resized_paths.$": "$.resize_result.Payload.resized_paths"
+                }
             })
         ).next(success_state)
 
@@ -362,7 +369,14 @@ class IdPlusSelfieStack(Stack):
                 "verification_id.$": "$.verification_id",
                 "success": False,
                 "user_email.$": "$.user_email",
-                "details.$": "$.details"
+                "details": {
+                    "verification_id.$": "$.verification_id",
+                    "status.$": "$.status",
+                    "timestamp.$": "$.timestamp",
+                    "error.$": "$.error",
+                    "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
+                    "moderation_results.$": "$.moderation_result.Payload.moderation_results"
+                }
             })
         ).next(fail_state)
 
@@ -389,7 +403,8 @@ class IdPlusSelfieStack(Stack):
         resize_choice = stepfunctions.Choice(
             self, "ResizeCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
+            stepfunctions.Condition.boolean_equals(
+                '$.resize_result.Payload.success', True),
             send_success_email
         ).otherwise(
             send_failure_email
@@ -398,7 +413,8 @@ class IdPlusSelfieStack(Stack):
         comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
+            stepfunctions.Condition.boolean_equals(
+                '$.comparison_result.Payload.success', True),
             resize_task.next(resize_choice)
         ).otherwise(
             send_failure_email
@@ -407,14 +423,12 @@ class IdPlusSelfieStack(Stack):
         moderation_choice = stepfunctions.Choice(
             self, "ModerationCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.moderation_result.Payload.success', True),
+            stepfunctions.Condition.boolean_equals(
+                '$.moderation_result.Payload.success', True),
             compare_faces_task.next(comparison_choice)
         ).otherwise(
             send_failure_email
         )
-
-        compare_faces_task.next(comparison_choice)
-        resize_task.next(resize_choice)
 
         # Define the chain
         chain = (
