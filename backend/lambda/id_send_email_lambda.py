@@ -23,7 +23,7 @@ def get_email_content(verification_id, success, details):
     styles = """
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #FF9900; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .header { background-color: #FF9900; color: black; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
         .content { background-color: #ffffff; padding: 20px; border: 1px solid #e2e8f0; border-radius: 0 0 5px 5px; }
         .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #718096; }
         .result-box { background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 15px; margin: 15px 0; }
@@ -35,6 +35,13 @@ def get_email_content(verification_id, success, details):
         .label { color: #4a5568; }
         .value { font-weight: bold; }
     """
+    if not success:
+        # Get failure reason from various possible sources
+        failure_reason = (
+            details.get('error') or 
+            comparison_results.get('Message') or 
+            'Verification requirements not met'
+        )
 
     if success:
         similarity = comparison_results.get('Similarity', 'N/A')
@@ -130,8 +137,6 @@ def get_email_content(verification_id, success, details):
                         <li>Clear, unobstructed view of face/ID</li>
                         <li>High-quality images</li>
                     </ul>
-
-                    <a href="#" class="button">Try Again</a>
                 </div>
                 <div class="footer">
                     <p>Need help? Contact our support team.</p>

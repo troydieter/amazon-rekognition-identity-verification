@@ -249,7 +249,8 @@ class IdPlusSelfieStack(Stack):
             layers=[pil_layer],
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
-                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group" # You must change this to a value you own
+                # You must change this to a value you own
+                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
@@ -372,9 +373,9 @@ class IdPlusSelfieStack(Stack):
                 "user_email.$": "$.user_email",
                 "details": {
                     "verification_id.$": "$.verification_id",
-                    "status.$": "$.status",
+                    "status.$": "$.comparison_result.Payload.details.status",
                     "timestamp.$": "$.timestamp",
-                    "error.$": "$.error",
+                    "error": "Face verification failed",  # Static error message instead of JsonPath
                     "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
                     "moderation_results.$": "$.moderation_result.Payload.moderation_results"
                 }
