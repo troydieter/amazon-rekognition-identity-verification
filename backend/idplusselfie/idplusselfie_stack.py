@@ -364,14 +364,15 @@ class IdPlusSelfieStack(Stack):
             fail_state
         )
 
+        compare_faces_task.next(comparison_choice)
+        resize_task.next(resize_choice)
+
         # Define the chain
         chain = (
             initial_state
             .next(process_verification)
-                .next(moderate_task)
-                .next(moderation_choice)  # This leads to compare_faces_task or fail_state
-                .next(comparison_choice)  # This leads to resize_task or fail_state
-                .next(resize_choice)      # This leads to success_state or fail_state
+            .next(moderate_task)
+            .next(moderation_choice)
         )
 
         # Create the state machine
