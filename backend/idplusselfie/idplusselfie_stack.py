@@ -271,7 +271,7 @@ class IdPlusSelfieStack(Stack):
         # Create the state machine
         sm = stepfunctions.StateMachine(
             self, "StateMachine",
-            comment="ID Verification State Machine"
+            comment="ID Verification State Machine",
             definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
             timeout=Duration.minutes(5),
             tracing_enabled=True,
