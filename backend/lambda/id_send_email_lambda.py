@@ -29,11 +29,15 @@ def get_email_content(verification_id, success, details):
         .result-box { background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 15px; margin: 15px 0; }
         .success { color: #48bb78; }
         .failure { color: #f56565; }
-        .button { display: inline-block; padding: 10px 20px; background-color: #FF9900; color: white; text-decoration: none; border-radius: 5px; margin-top: 15px; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #FF9900; color: black !important; text-decoration: none; border-radius: 5px; margin-top: 15px; }
         .details { margin: 15px 0; }
         .detail-row { display: flex; justify-content: space-between; margin: 5px 0; }
         .label { color: #4a5568; }
         .value { font-weight: bold; }
+        /* Override any inherited styles */
+        a, a:link, a:visited, a:hover, a:active { color: #333333 !important; text-decoration: none; }
+        span, span.im { color: #333333 !important; }
+        * { color: inherit; }
     """
     if not success:
         # Get failure reason from various possible sources
