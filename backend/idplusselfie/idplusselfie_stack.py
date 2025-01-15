@@ -249,7 +249,7 @@ class IdPlusSelfieStack(Stack):
             layers=[pil_layer],
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
-                "FROM_EMAIL_ADDRESS": "test@awsuser.group"
+                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group" # You must change this to a value you own
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
