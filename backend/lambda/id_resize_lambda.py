@@ -85,7 +85,7 @@ def update_dynamodb_record(verification_id, resized_paths):
                 ResizedAt = :resized_at,
                 StateMachineStatus = :status,
                 ProcessingCompleted = :completed_at,
-                Status = :verification_status
+                #vs = :verification_status
         """
         
         expression_values = {
@@ -95,7 +95,11 @@ def update_dynamodb_record(verification_id, resized_paths):
             ':resized_at': current_time,
             ':status': 'COMPLETED_SUCCESSFUL',
             ':completed_at': current_time,
-            ':verification_status': 'VERIFIED'  # Or whatever final status you want
+            ':verification_status': 'VERIFIED'
+        }
+
+        expression_names = {
+            '#vs': 'Status'  # Use expression attribute name for reserved word
         }
         
         table.update_item(
@@ -104,7 +108,8 @@ def update_dynamodb_record(verification_id, resized_paths):
                 'Timestamp': timestamp
             },
             UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_values
+            ExpressionAttributeValues=expression_values,
+            ExpressionAttributeNames=expression_names  # Add expression names
         )
         
         logger.info(f"Updated DynamoDB record for verification ID: {verification_id} - Status: COMPLETED_SUCCESSFUL")
@@ -146,13 +151,16 @@ def update_failed_status(verification_id, error_message):
                 SET StateMachineStatus = :status,
                     LastUpdated = :updated,
                     ErrorMessage = :error,
-                    Status = :verification_status
+                    #vs = :verification_status
             """,
             ExpressionAttributeValues={
                 ':status': 'COMPLETED_FAILED',
                 ':updated': current_time,
                 ':error': error_message,
                 ':verification_status': 'FAILED'
+            },
+            ExpressionAttributeNames={
+                '#vs': 'Status'  # Use expression attribute name for reserved word
             }
         )
         
