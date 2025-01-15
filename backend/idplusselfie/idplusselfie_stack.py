@@ -336,20 +336,42 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
-        # Create choice state
-        choice_state = stepfunctions.Choice(
-            self, "VerificationChoice"
+        # Create choice states for each check
+        moderation_choice = stepfunctions.Choice(
+            self, "ModerationCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.success', True),
-            success_state
+            stepfunctions.Condition.boolean_equals('$.moderation_result.Payload.success', True),
+            compare_faces_task  # If moderation passes, go to face comparison
         ).otherwise(
             fail_state
         )
+
+        comparison_choice = stepfunctions.Choice(
+            self, "ComparisonCheck"
+        ).when(
+            stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
+            resize_task  # If comparison passes, go to resize
+        ).otherwise(
+            fail_state
+        )
+
+        resize_choice = stepfunctions.Choice(
+            self, "ResizeCheck"
+        ).when(
+            stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
+            success_state  # If resize succeeds, go to success state
+        ).otherwise(
+            fail_state
+        )
+
         # Define the chain
         chain = (
             initial_state
             .next(process_verification)
-            .next(choice_state)
+                .next(moderate_task)
+                .next(moderation_choice)  # This leads to compare_faces_task or fail_state
+                .next(comparison_choice)  # This leads to resize_task or fail_state
+                .next(resize_choice)      # This leads to success_state or fail_state
         )
 
         # Create the state machine
