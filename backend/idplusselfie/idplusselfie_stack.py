@@ -185,23 +185,10 @@ class IdPlusSelfieStack(Stack):
             error="VerificationError"
         )
 
-        id_sm_update_status_lambda = _lambda.Function(
-            self,
-            "UpdateStatusLambda",
-            code=_lambda.Code.from_asset("lambda"),
-            handler="id_sm_update_status_lambda.lambda_handler",
-            runtime=_lambda.Runtime.PYTHON_3_12,
-            environment={
-                "DYNAMODB_TABLE_NAME": verification_table.table_name
-            }
-        )
-
-        verification_table.grant_read_write_data(id_sm_update_status_lambda)
-
         # Create the initial state for the state machine
         initial_state = stepfunctions.Pass(
             self, "InitialState",
-            parameters={  
+            parameters={
                 "status": "STARTED",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
@@ -212,27 +199,6 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
-        # Create task states that update status
-        update_processing = stepfunctions_tasks.LambdaInvoke(
-            self, "UpdateProcessingStatus",
-            lambda_function=id_sm_update_status_lambda,
-            payload=stepfunctions.TaskInput.from_object({
-                "verification_id.$": "$.verification_id",
-                "status": "PROCESSING",
-                "timestamp.$": "$$.Execution.StartTime"
-            })
-        )
-
-        update_complete = stepfunctions_tasks.LambdaInvoke(
-            self, "UpdateCompleteStatus",
-            lambda_function=id_sm_update_status_lambda,
-            payload=stepfunctions.TaskInput.from_object({
-                "verification_id.$": "$.verification_id",
-                "status": "COMPLETED",
-                "timestamp.$": "$$.Execution.StartTime"
-            })
-        )
-
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
         verification_table.grant_read_write_data(
@@ -241,7 +207,7 @@ class IdPlusSelfieStack(Stack):
         # Create the verification process state
         verification_process = stepfunctions.Pass(
             self, "ProcessVerification",
-            parameters={  
+            parameters={
                 "status": "PROCESSING",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
@@ -271,7 +237,7 @@ class IdPlusSelfieStack(Stack):
         # Create the state machine
         sm = stepfunctions.StateMachine(
             self, "StateMachine",
-            comment="ID Verification State Machine",
+            comment="IDVerification_State_Machine",
             definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
             timeout=Duration.minutes(5),
             tracing_enabled=True,
