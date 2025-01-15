@@ -169,7 +169,7 @@ def validate_image(image_data):
         image = Image.open(BytesIO(image_data))
         
         # Check image format
-        if image.format not in ['JPEG', 'JPG', 'PNG']:
+        if image.format not in ['JPEG', 'JPG', 'PNG', 'BMP', 'TIFF']:
             raise ValueError(f"Unsupported image format: {image.format}")
         
         # Check image size (e.g., max 10MB)
