@@ -201,7 +201,7 @@ class IdPlusSelfieStack(Stack):
         # Create the initial state for the state machine
         initial_state = stepfunctions.Pass(
             self, "InitialState",
-            parameters={  # Use parameters instead of result
+            parameters={  
                 "status": "STARTED",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
@@ -241,7 +241,7 @@ class IdPlusSelfieStack(Stack):
         # Create the verification process state
         verification_process = stepfunctions.Pass(
             self, "ProcessVerification",
-            parameters={  # Use parameters instead of result
+            parameters={  
                 "status": "PROCESSING",
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
@@ -264,19 +264,14 @@ class IdPlusSelfieStack(Stack):
         # Define the chain
         chain = (
             initial_state
-            .next(update_processing)
             .next(verification_process)
-            .next(choice_state.when(
-                stepfunctions.Condition.boolean_equals('$.success', True),
-                update_complete.next(success_state)
-            ).otherwise(
-                fail_state)
-            )
+            .next(choice_state)
         )
 
         # Create the state machine
         sm = stepfunctions.StateMachine(
             self, "StateMachine",
+            comment="ID Verification State Machine"
             definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
             timeout=Duration.minutes(5),
             tracing_enabled=True,
