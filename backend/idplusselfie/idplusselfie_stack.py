@@ -395,9 +395,6 @@ class IdPlusSelfieStack(Stack):
             fail_state
         )
 
-        success_email_flow = send_email_task.next(success_state)
-        failure_email_flow = send_email_task.next(fail_state)
-
         comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
