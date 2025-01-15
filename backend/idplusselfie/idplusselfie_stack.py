@@ -201,15 +201,15 @@ class IdPlusSelfieStack(Stack):
         # Create the initial state for the state machine
         initial_state = stepfunctions.Pass(
             self, "InitialState",
-            parameters={
+            result=stepfunctions.Result.from_object({
                 "status": "STARTED",
                 "timestamp.$": "$$.Execution.StartTime",
-                "success": True,
-                "verification_id.$": "$.verification_id",  # Pass through from input
-                "user_email.$": "$.user_email",  # Pass through from input
-                "dl_key.$": "$.dl_key",  # Pass through from input
-                "selfie_key.$": "$.selfie_key"  # Pass through from input
-            }
+                "verification_id.$": "$.verification_id",
+                "user_email.$": "$.user_email",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "success": True  # Explicitly set success
+            })
         )
 
         # Create task states that update status
@@ -239,28 +239,39 @@ class IdPlusSelfieStack(Stack):
             id_trigger_stepfunction_lambda)
 
         # Create the verification process state
-        # Choice state
-        verification_process = stepfunctions.Choice(
-            self, "ProcessVerification"
+        verification_process = stepfunctions.Pass(
+            self, "ProcessVerification",
+            result=stepfunctions.Result.from_object({
+                "status": "PROCESSING",
+                "timestamp.$": "$$.Execution.StartTime",
+                "verification_id.$": "$.verification_id",
+                "user_email.$": "$.user_email",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "success": True  # Explicitly set success
+            })
+        )
+
+        # Create choice state
+        choice_state = stepfunctions.Choice(
+            self, "VerificationChoice"
         ).when(
             stepfunctions.Condition.boolean_equals('$.success', True),
-            update_complete.next(success_state)
+            success_state
         ).otherwise(
             fail_state
         )
-
-        # Connect the states
+        # Define the chain
         chain = (
             initial_state
-            .next(update_processing)
             .next(verification_process)
+            .next(choice_state)
         )
 
         # Create the state machine
         sm = stepfunctions.StateMachine(
             self, "StateMachine",
-            definition_body=stepfunctions.DefinitionBody.from_chainable(
-                chain),
+            definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
             timeout=Duration.minutes(5),
             tracing_enabled=True,
             logs=stepfunctions.LogOptions(
