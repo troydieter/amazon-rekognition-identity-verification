@@ -238,6 +238,33 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_resize_lambda)
 
+        send_email_lambda = _lambda.Function(
+            self,
+            "IDHandlerSendEmail",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_send_email_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(30),
+            layers=[pil_layer],
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "FROM_EMAIL_ADDRESS": "test@awsuser.group"
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        send_email_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ses:SendEmail",
+                    "ses:SendRawEmail"
+                ],
+                resources=["*"]
+            )
+        )
+
         verification_table.grant_read_write_data(id_moderate_lambda)
         verification_table.grant_read_write_data(id_compare_faces_lambda)
         verification_table.grant_read_write_data(id_resize_lambda)
@@ -317,6 +344,17 @@ class IdPlusSelfieStack(Stack):
             result_path="$.resize_result"  # Store result in this path
         )
 
+        send_email_task = stepfunctions_tasks.LambdaInvoke(
+            self, "SendEmailNotification",
+            lambda_function=send_email_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "success.$": "$.success",
+                "user_email.$": "$.user_email",
+                "details.$": "$.details"
+            })
+        )
+
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
         verification_table.grant_read_write_data(
@@ -346,6 +384,9 @@ class IdPlusSelfieStack(Stack):
             fail_state
         )
 
+        success_email_flow = send_email_task.next(success_state)
+        failure_email_flow = send_email_task.next(fail_state)
+
         comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
@@ -359,9 +400,9 @@ class IdPlusSelfieStack(Stack):
             self, "ResizeCheck"
         ).when(
             stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
-            success_state  # If resize succeeds, go to success state
+            success_email_flow  # Send success email before completing
         ).otherwise(
-            fail_state
+            failure_email_flow  # Send failure email before failing
         )
 
         compare_faces_task.next(comparison_choice)
@@ -373,6 +414,8 @@ class IdPlusSelfieStack(Stack):
             .next(process_verification)
             .next(moderate_task)
             .next(moderation_choice)
+            .next(comparison_choice)
+            .next(resize_choice)
         )
 
         # Create the state machine
