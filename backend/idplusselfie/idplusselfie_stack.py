@@ -155,6 +155,7 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_upload_lambda)
 
+        # Step Functions
         # Create the beginning Lambda for the SM
         id_trigger_stepfunction_lambda = _lambda.Function(
             self,
@@ -170,6 +171,87 @@ class IdPlusSelfieStack(Stack):
                 "DYNAMODB_TABLE_NAME": verification_table.table_name
             },
             log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+
+        id_moderate_lambda = _lambda.Function(
+            self,
+            "IpsHandlerModerate",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_moderate_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(10),
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        upload_bucket.grant_read(id_moderate_lambda)
+
+        # Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
+        id_moderate_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["rekognition:DetectModerationLabels"],
+                # Limit this further if possible for better security
+                resources=["*"],
+            )
+        )
+
+        id_compare_faces_lambda = _lambda.Function(
+            self,
+            "IpsHandlerCompareFaces",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_compare_faces_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(10),
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        upload_bucket.grant_read(id_compare_faces_lambda)
+
+        id_resize_lambda = _lambda.Function(
+            self,
+            "IDHandlerResize",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_resize_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(30),
+            layers=[pil_layer],
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        upload_bucket.grant_read_write(id_resize_lambda)
+
+        verification_table.grant_read_write_data(id_moderate_lambda)
+        verification_table.grant_read_write_data(id_compare_faces_lambda)
+        verification_table.grant_read_write_data(id_resize_lambda)
+
+        # Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
+        id_compare_faces_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "rekognition:CompareFaces",
+                    "rekognition:AssociateFaces"],
+                # Limit this further if possible for better security
+                resources=["*"],
+            )
         )
 
         # Create success end state
@@ -199,13 +281,49 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
+        moderate_task = stepfunctions_tasks.LambdaInvoke(
+            self, "ModerateImages",
+            lambda_function=id_moderate_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "timestamp.$": "$$.Execution.StartTime"
+            }),
+            result_path="$.moderation_result"  # Store result in this path
+        )
+
+        compare_faces_task = stepfunctions_tasks.LambdaInvoke(
+            self, "CompareFaces",
+            lambda_function=id_compare_faces_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "timestamp.$": "$$.Execution.StartTime"
+            }),
+            result_path="$.comparison_result"  # Store result in this path
+        )
+
+        resize_task = stepfunctions_tasks.LambdaInvoke(
+            self, "ResizeImages",
+            lambda_function=id_resize_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "dl_key.$": "$.dl_key",
+                "selfie_key.$": "$.selfie_key",
+                "timestamp.$": "$$.Execution.StartTime"
+            }),
+            result_path="$.resize_result"  # Store result in this path
+        )
+
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
         verification_table.grant_read_write_data(
             id_trigger_stepfunction_lambda)
 
         # Create the verification process state
-        verification_process = stepfunctions.Pass(
+        process_verification = stepfunctions.Pass(
             self, "ProcessVerification",
             parameters={
                 "status": "PROCESSING",
@@ -230,7 +348,7 @@ class IdPlusSelfieStack(Stack):
         # Define the chain
         chain = (
             initial_state
-            .next(verification_process)
+            .next(process_verification)
             .next(choice_state)
         )
 
@@ -312,65 +430,8 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_delete_lambda)
 
-        id_compress_lambda = _lambda.Function(
-            self,
-            "IDHandlerCompress",
-            code=_lambda.Code.from_asset("lambda"),
-            handler="id_compress_lambda.lambda_handler",
-            runtime=_lambda.Runtime.PYTHON_3_12,
-            memory_size=256,
-            timeout=Duration.seconds(30),
-            layers=[pil_layer],
-            environment={
-                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
-                "S3_BUCKET_NAME": upload_bucket.bucket_name
-            },
-            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
-        )
-
-        upload_bucket.grant_read_write(id_compress_lambda)
-
-        # Commenting out the moderate Lambda function until a step function is introduced
-        # id_moderate_lambda = _lambda.Function(
-        #     self,
-        #     "IpsHandlerModerate",
-        #     code=_lambda.Code.from_asset("lambda"),
-        #     handler="id_moderate_lambda.lambda_handler",
-        #     runtime=_lambda.Runtime.PYTHON_3_12,
-        #     memory_size=256,
-        #     timeout=Duration.seconds(10),
-        #     environment={
-        #         "LOG_LEVEL": "INFO",  # Add a log level for runtime control
-        #         "S3_BUCKET_NAME": upload_bucket.bucket_name
-        #     },
-        #     log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
-        # )
-
-        # upload_bucket.grant_read_write(id_moderate_lambda)
-
         verification_table.grant_read_write_data(id_upload_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
-
-        # Attach an IAM policy for the Entrypoint Lambda function to allow Rekognition actions
-        id_upload_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["rekognition:CompareFaces"],
-                # Limit this further if possible for better security
-                resources=["*"],
-            )
-        )
-
-        # Attach an IAM policy for the Moderate Lambda function to allow Rekognition actions
-        # Commented out until moderation Lambda function is in a step function
-        # id_moderate_lambda.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=["rekognition:DetectModerationLabels"],
-        #         # Limit this further if possible for better security
-        #         resources=["*"],
-        #     )
-        # )
 
         api = apigateway.RestApi(
             self,
