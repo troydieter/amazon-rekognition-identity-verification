@@ -1,17 +1,18 @@
 import { useState } from "react";
 import axios from "axios";
 import "./App.css";
-import { Authenticator, useTheme, View, Image, Text, Heading, useAuthenticator, Button } from "@aws-amplify/ui-react";
-import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
+import { Authenticator } from "@aws-amplify/ui-react";
+import { Amplify } from "aws-amplify";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolClientId: `${process.env.REACT_APP_USERPOOL_CLIENTID}`,
-      userPoolId: `${process.env.REACT_APP_USERPOOL_ID}`,
+      userPoolClientId: process.env.REACT_APP_USERPOOL_CLIENTID,
+      userPoolId: process.env.REACT_APP_USERPOOL_ID,
+      region: process.env.REACT_APP_REGION
     },
-  },
+  }
 });
 
 function App() {
@@ -21,13 +22,13 @@ function App() {
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
 
-  const API_URL = `${process.env.REACT_APP_API_URL}/compare-faces`;
+  const API_URL = `${process.env.REACT_APP_API_URL}/id-verify`;
 
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
       reader.onerror = (error) => reject(error);
     });
   };
@@ -39,60 +40,114 @@ function App() {
     }
   
     try {
-      // Get the current authenticated session
+      console.log('1. Starting upload process...');
+      
       const { tokens } = await fetchAuthSession();
       const token = tokens.idToken.toString();
+      
       const licenseBase64 = await convertToBase64(licenseFile);
       const selfieBase64 = await convertToBase64(selfieFile);
+      
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "x-api-key": process.env.REACT_APP_API_KEY
+      };
   
-      const response = await axios.post(`${API_URL}`, 
-        {
+      console.log('Request details:', {
+        url: API_URL,
+        headerKeys: Object.keys(headers),
+        apiKeyPresent: !!headers['x-api-key']
+      });
+  
+      const response = await axios({
+        method: 'post',
+        url: API_URL,
+        data: {
           dl: licenseBase64,
-          selfie: selfieBase64
+          selfie: selfieBase64,
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.REACT_APP_API_KEY,
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-    
-      console.log('Full response:', response);
+        headers: headers,
+        timeout: 30000
+      });
   
-      if (response.status === 200 && response.data && response.data.body) {
-        const bodyData = JSON.parse(response.data.body);
-        console.log('Parsed body data:', bodyData);
-      
-        if (bodyData.verificationId && bodyData.result && typeof bodyData.result.similarity !== 'undefined') {
-          const roundedSimilarity = parseFloat(bodyData.result.similarity).toFixed(2);
-          const verificationId = bodyData.verificationId;
-          let message;
-      
-          if (roundedSimilarity >= 80) {
-            message = `Verification successful.\nVerification ID: ${verificationId}\nSimilarity: ${roundedSimilarity}%`;
-          } else if (roundedSimilarity > 0) {
-            message = `Verification failed.\nVerification ID: ${verificationId}\nSimilarity: ${roundedSimilarity}%\nThe similarity score is below the required threshold of 80%.`;
-          } else {
-            message = `Verification failed.\nVerification ID: ${verificationId}\nNo face matches found.`;
-          }
-      
+      console.log('Raw response data:', JSON.stringify(response.data, null, 2));
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+  
+      // Handle the response data
+      if (response.status === 200) {
+        let resultData;
+        
+        // Check if response.data is a string that needs parsing
+        if (typeof response.data === 'string') {
+          resultData = JSON.parse(response.data);
+        } else {
+          resultData = response.data;
+        }
+  
+        // Check if there's a nested body that needs parsing
+        if (resultData.body && typeof resultData.body === 'string') {
+          resultData = JSON.parse(resultData.body);
+        }
+  
+        console.log('Processed response data:', resultData);
+  
+        if (resultData.verificationId) {
+          const message = `Verification ID: ${resultData.verificationId}\n` +
+                         `Status: ${resultData.status}\n` +
+                         `Timestamp: ${resultData.timestamp}`;
           alert(message);
         } else {
-          throw new Error('Unexpected data format in response body');
+          throw new Error('Missing verification ID in response');
         }
       } else {
-        console.error('Unexpected response format:', response.data);
-        throw new Error('Unexpected response format');
-      } 
+        throw new Error(`Unexpected status code: ${response.status}`);
+      }
+  
     } catch (error) {
-      console.error('Error:', error);
-      alert('An error occurred during the verification process.');
+      console.error('Upload error:', {
+        name: error.name,
+        message: error.message,
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data
+        } : 'No response data'
+      });
+  
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error("Error response details:", {
+          data: error.response.data,
+          status: error.response.status,
+          headers: error.response.headers
+        });
+        alert(`Server error: ${
+          error.response.data.error || 
+          (error.response.data.body && JSON.parse(error.response.data.body).error) || 
+          "Unknown error"
+        }`);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error("No response received:", {
+          url: API_URL,
+          method: "POST"
+        });
+        alert(
+          "The server did not respond. Please try again or contact support if the problem persists."
+        );
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error("Request setup error:", error.message);
+        alert("Error setting up the request: " + error.message);
+      }
     }
   };
   
-
   const handleLicenseChange = (e) => {
     const file = e.target.files[0];
     setLicenseFile(file);
@@ -108,18 +163,18 @@ function App() {
   const formFields = {
     signUp: {
       email: {
-        order: 1
+        order: 1,
       },
       username: {
-        order: 2
+        order: 2,
       },
       password: {
-        order: 3
+        order: 3,
       },
       confirm_password: {
-        order: 4
-      }
-    }
+        order: 4,
+      },
+    },
   };
 
   return (
@@ -128,9 +183,11 @@ function App() {
         <div className="App">
           <header className="App-header">
             <h1>Hello {user?.username}</h1>
-            <button onClick={signOut} className="sign-out-btn">Sign out</button>
+            <button onClick={signOut} className="sign-out-btn">
+              Sign out
+            </button>
           </header>
-          
+
           <main className="app-main">
             <div className="upload-container">
               <div className="upload-box">
