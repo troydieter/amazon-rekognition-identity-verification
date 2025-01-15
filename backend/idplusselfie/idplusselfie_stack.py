@@ -238,6 +238,34 @@ class IdPlusSelfieStack(Stack):
 
         upload_bucket.grant_read_write(id_resize_lambda)
 
+        send_email_lambda = _lambda.Function(
+            self,
+            "IDHandlerSendEmail",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_send_email_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(30),
+            layers=[pil_layer],
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                # You must change this to a value you own
+                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        send_email_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ses:SendEmail",
+                    "ses:SendRawEmail"
+                ],
+                resources=["*"]
+            )
+        )
+
         verification_table.grant_read_write_data(id_moderate_lambda)
         verification_table.grant_read_write_data(id_compare_faces_lambda)
         verification_table.grant_read_write_data(id_resize_lambda)
@@ -317,6 +345,43 @@ class IdPlusSelfieStack(Stack):
             result_path="$.resize_result"  # Store result in this path
         )
 
+        send_success_email = stepfunctions_tasks.LambdaInvoke(
+            self, "SendSuccessEmail",
+            lambda_function=send_email_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "success": True,
+                "user_email.$": "$.user_email",
+                "details": {
+                    "verification_id.$": "$.verification_id",
+                    "status.$": "$.status",
+                    "timestamp.$": "$.timestamp",
+                    "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
+                    "moderation_results.$": "$.moderation_result.Payload.moderation_results",
+                    "resized_paths.$": "$.resize_result.Payload.resized_paths"
+                }
+            }),
+            retry_on_service_exceptions=False
+        ).next(success_state)
+
+        send_failure_email = stepfunctions_tasks.LambdaInvoke(
+            self, "SendFailureEmail",
+            lambda_function=send_email_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "success": False,
+                "user_email.$": "$.user_email",
+                "details": {
+                    "verification_id.$": "$.verification_id",
+                    "status.$": "$.comparison_result.Payload.details.status",
+                    "timestamp.$": "$.timestamp",
+                    "error": "Face verification failed",  # Static error message instead of JsonPath
+                    "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
+                    "moderation_results.$": "$.moderation_result.Payload.moderation_results"
+                }
+            })
+        ).next(fail_state)
+
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
         verification_table.grant_read_write_data(
@@ -337,35 +402,35 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create choice states for each check
-        moderation_choice = stepfunctions.Choice(
-            self, "ModerationCheck"
+        resize_choice = stepfunctions.Choice(
+            self, "ResizeCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.moderation_result.Payload.success', True),
-            compare_faces_task  # If moderation passes, go to face comparison
+            stepfunctions.Condition.boolean_equals(
+                '$.resize_result.Payload.success', True),
+            send_success_email
         ).otherwise(
-            fail_state
+            send_failure_email
         )
 
         comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.comparison_result.Payload.success', True),
-            resize_task  # If comparison passes, go to resize
+            stepfunctions.Condition.boolean_equals(
+                '$.comparison_result.Payload.success', True),
+            resize_task.next(resize_choice)
         ).otherwise(
-            fail_state
+            send_failure_email
         )
 
-        resize_choice = stepfunctions.Choice(
-            self, "ResizeCheck"
+        moderation_choice = stepfunctions.Choice(
+            self, "ModerationCheck"
         ).when(
-            stepfunctions.Condition.boolean_equals('$.resize_result.Payload.success', True),
-            success_state  # If resize succeeds, go to success state
+            stepfunctions.Condition.boolean_equals(
+                '$.moderation_result.Payload.success', True),
+            compare_faces_task.next(comparison_choice)
         ).otherwise(
-            fail_state
+            send_failure_email
         )
-
-        compare_faces_task.next(comparison_choice)
-        resize_task.next(resize_choice)
 
         # Define the chain
         chain = (
