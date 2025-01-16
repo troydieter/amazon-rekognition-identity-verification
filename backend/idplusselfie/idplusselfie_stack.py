@@ -416,14 +416,30 @@ class IdPlusSelfieStack(Stack):
                 "user_email.$": "$.user_email",
                 "details": {
                     "verification_id.$": "$.verification_id",
-                    "status.$": "$.comparison_result.Payload.details.status",
                     "timestamp.$": "$.timestamp",
-                    "error": "Face verification failed",  # Static error message instead of JsonPath
-                    "comparison_results.$": "$.comparison_result.Payload.details.comparison_results",
-                    "moderation_results.$": "$.moderation_result.Payload.moderation_results"
+                    "error_details": {
+                        "moderation": {
+                            "status.$": "$.moderation_result.Payload.success",
+                            "results.$": "$.moderation_result.Payload.moderation_results"
+                        },
+                        "id_analysis": {
+                            "status.$": "$.id_analysis_result.Payload.success",
+                            "results.$": "$.id_analysis_result.Payload.analysis_results"
+                        },
+                        "comparison": {
+                            "status.$": "$.comparison_result.Payload.details.status",
+                            "results.$": "$.comparison_result.Payload.details.comparison_results"
+                        }
+                    },
+                    "validation_details": {
+                        "id_analysis.$": "$.id_analysis_result.Payload.analysis_results.validation",
+                        "moderation_labels.$": "$.moderation_result.Payload.moderation_results.Labels",
+                        "comparison_details.$": "$.comparison_result.Payload.details"
+                    }
                 }
             })
         ).next(fail_state)
+
 
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)

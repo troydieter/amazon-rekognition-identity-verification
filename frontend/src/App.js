@@ -21,6 +21,7 @@ function App() {
   const [idFileName, setidFileName] = useState("No file chosen");
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
+  const [isAttested, setIsAttested] = useState(false);
 
   const API_URL = `${process.env.REACT_APP_API_URL}id-verify`;
 
@@ -148,7 +149,7 @@ function App() {
     }
   };
   
-  const handleLicenseChange = (e) => {
+  const handleIDChange = (e) => {
     const file = e.target.files[0];
     setidFile(file);
     setidFileName(file ? file.name : "No file chosen");
@@ -194,12 +195,12 @@ function App() {
                 <h3>Upload Identification (U.S. State Identification, Drivers License or Passport)</h3>
                 <input
                   type="file"
-                  id="license-file"
+                  id="id-file"
                   className="file-input"
-                  onChange={handleLicenseChange}
+                  onChange={handleIDChange}
                   accept="image/*"
                 />
-                <label htmlFor="license-file" className="file-label">
+                <label htmlFor="id-file" className="file-label">
                   Choose File
                 </label>
                 <div className="file-name">{idFileName}</div>
@@ -221,7 +222,28 @@ function App() {
               </div>
             </div>
 
-            <button className="verify-button" onClick={uploadFiles}>
+            <div className="attestation-container">
+              <label className="attestation-label">
+                <input
+                  type="checkbox"
+                  checked={isAttested}
+                  onChange={(e) => setIsAttested(e.target.checked)}
+                  className="attestation-checkbox"
+                />
+                <span className="attestation-text">
+                  I hereby attest, under penalty of perjury, that I am the rightful owner of the 
+                  identification document being submitted, and that the selfie photo is a current 
+                  and accurate representation of myself. I understand that submitting false 
+                  identification or misrepresenting my identity may result in legal consequences.
+                </span>
+              </label>
+            </div>
+
+            <button 
+              className={`verify-button ${!isAttested ? 'verify-button-disabled' : ''}`}
+              onClick={uploadFiles}
+              disabled={!isAttested}
+            >
               Verify Identity
             </button>
           </main>
@@ -230,4 +252,5 @@ function App() {
     </Authenticator>
   );
 }
+
 export default App;
