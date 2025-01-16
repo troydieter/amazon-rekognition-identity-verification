@@ -425,19 +425,21 @@ class IdPlusSelfieStack(Stack):
                         "id_analysis": {
                             "status.$": "$.id_analysis_result.Payload.success",
                             "results.$": "$.id_analysis_result.Payload.analysis_results"
+                        },
+                        "comparison": {
+                            "status.$": "$.comparison_result.Payload.details.status",
+                            "results.$": "$.comparison_result.Payload.details.comparison_results"
                         }
-                    },
-                    "error_messages": {
-                        "moderation.$": "$.moderation_result.Payload.error",
-                        "id_analysis.$": "$.id_analysis_result.Payload.error"
                     },
                     "validation_details": {
                         "id_analysis.$": "$.id_analysis_result.Payload.analysis_results.validation",
-                        "moderation_labels.$": "$.moderation_result.Payload.moderation_results.Labels"
+                        "moderation_labels.$": "$.moderation_result.Payload.moderation_results.Labels",
+                        "comparison_details.$": "$.comparison_result.Payload.details"
                     }
                 }
             })
         ).next(fail_state)
+
 
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
