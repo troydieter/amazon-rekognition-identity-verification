@@ -130,7 +130,7 @@ class IdPlusSelfieStack(Stack):
             write_attributes=cognito.ClientAttributes()
             .with_standard_attributes(
                 email=True
-        )
+            )
         )
 
         # Create Cognito Authorizer
@@ -206,6 +206,32 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
+        id_analyze_lambda = _lambda.Function(
+            self,
+            "IpsHandlerAnalyze",
+            code=_lambda.Code.from_asset("lambda"),
+            handler="id_analyze_lambda.lambda_handler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            memory_size=256,
+            timeout=Duration.seconds(10),
+            environment={
+                "LOG_LEVEL": "INFO",  # Add a log level for runtime control
+                "S3_BUCKET_NAME": upload_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": verification_table.table_name
+            },
+            log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
+        )
+
+        id_analyze_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["textract:AnalyzeId"],
+                resources=["*"],
+            )
+        )
+
+        upload_bucket.grant_read(id_analyze_lambda)
+
         id_compare_faces_lambda = _lambda.Function(
             self,
             "IpsHandlerCompareFaces",
@@ -272,6 +298,7 @@ class IdPlusSelfieStack(Stack):
         )
 
         verification_table.grant_read_write_data(id_moderate_lambda)
+        verification_table.grant_read_write_data(id_analyze_lambda)
         verification_table.grant_read_write_data(id_compare_faces_lambda)
         verification_table.grant_read_write_data(id_resize_lambda)
 
@@ -324,6 +351,17 @@ class IdPlusSelfieStack(Stack):
                 "timestamp.$": "$$.Execution.StartTime"
             }),
             result_path="$.moderation_result"  # Store result in this path
+        )
+
+        analyze_id_task = stepfunctions_tasks.LambdaInvoke(
+            self, "AnalyzeIDDocument",
+            lambda_function=id_analyze_lambda,
+            payload=stepfunctions.TaskInput.from_object({
+                "verification_id.$": "$.verification_id",
+                "dl_key.$": "$.dl_key",
+                "timestamp.$": "$$.Execution.StartTime"
+            }),
+            result_path="$.id_analysis_result"  # Store result in this path
         )
 
         compare_faces_task = stepfunctions_tasks.LambdaInvoke(
@@ -427,12 +465,22 @@ class IdPlusSelfieStack(Stack):
             send_failure_email
         )
 
+        analyze_id_choice = stepfunctions.Choice(
+            self, "AnalyzeIDCheck"
+        ).when(
+            stepfunctions.Condition.boolean_equals(
+                '$.id_analysis_result.Payload.success', True),
+            compare_faces_task.next(comparison_choice)
+        ).otherwise(
+            send_failure_email
+        )
+
         moderation_choice = stepfunctions.Choice(
             self, "ModerationCheck"
         ).when(
             stepfunctions.Condition.boolean_equals(
                 '$.moderation_result.Payload.success', True),
-            compare_faces_task.next(comparison_choice)
+            analyze_id_task.next(analyze_id_choice)
         ).otherwise(
             send_failure_email
         )
