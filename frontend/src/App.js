@@ -45,7 +45,7 @@ function App() {
       const { tokens } = await fetchAuthSession();
       const token = tokens.idToken.toString();
       
-      const licenseBase64 = await convertToBase64(idFile);
+      const idBase64 = await convertToBase64(idFile);
       const selfieBase64 = await convertToBase64(selfieFile);
       
       const headers = {
@@ -64,7 +64,7 @@ function App() {
         method: 'post',
         url: API_URL,
         data: {
-          identity: licenseBase64,
+          identity: idBase64,
           selfie: selfieBase64,
         },
         headers: headers,
