@@ -100,14 +100,6 @@ class IdPlusSelfieStack(Stack):
                 email=cognito.StandardAttribute(
                     required=True,
                     mutable=True
-                ),
-                given_name=cognito.StandardAttribute(
-                    required=True,
-                    mutable=True
-                ),
-                family_name=cognito.StandardAttribute(
-                    required=True,
-                    mutable=True
                 )
             ),
             account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
