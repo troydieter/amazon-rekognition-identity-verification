@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_stepfunctions as stepfunctions,
     aws_stepfunctions_tasks as stepfunctions_tasks,
+    aws_wafv2 as wafv2,
     RemovalPolicy,
     CfnOutput,
 )
@@ -123,8 +124,13 @@ class IdPlusSelfieStack(Stack):
             ),
             read_attributes=cognito.ClientAttributes()
             .with_standard_attributes(
+                email=True,
+                email_verified=True
+            ),
+            write_attributes=cognito.ClientAttributes()
+            .with_standard_attributes(
                 email=True
-            )
+        )
         )
 
         # Create Cognito Authorizer
@@ -249,7 +255,7 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 # You must change this to a value you own
-                "FROM_EMAIL_ADDRESS": "ID_Verify@nwsl.me"
+                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
@@ -520,9 +526,66 @@ class IdPlusSelfieStack(Stack):
         verification_table.grant_read_write_data(id_upload_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
 
+        api_web_acl = wafv2.CfnWebACL(self, "ApiWebACL",
+                                      description="API Gateway WAF WEB ACL",
+                                      default_action=wafv2.CfnWebACL.DefaultActionProperty(
+                                          allow={}),
+                                      scope="REGIONAL",
+                                      visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                                          cloud_watch_metrics_enabled=True,
+                                          metric_name="ApiWebACLMetric",
+                                          sampled_requests_enabled=True
+                                      ),
+                                      rules=[
+                                          wafv2.CfnWebACL.RuleProperty(
+                                              name="AWSManagedRulesCommonRuleSet",
+                                              priority=1,
+                                              override_action=wafv2.CfnWebACL.OverrideActionProperty(
+                                                  none={}),
+                                              statement=wafv2.CfnWebACL.StatementProperty(
+                                                  managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                                                      vendor_name="AWS",
+                                                      name="AWSManagedRulesCommonRuleSet",
+                                                      rule_action_overrides=[
+                                                          wafv2.CfnWebACL.RuleActionOverrideProperty(
+                                                              name="SizeRestrictions_BODY",
+                                                              action_to_use=wafv2.CfnWebACL.RuleActionProperty(
+                                                                  allow={}
+                                                              )
+                                                          )
+                                                      ]
+                                                  )
+                                              ),
+                                              visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                                                  cloud_watch_metrics_enabled=True,
+                                                  metric_name="AWSManagedRulesCommonRuleSetMetric",
+                                                  sampled_requests_enabled=True
+                                              )
+                                          ),
+                                          wafv2.CfnWebACL.RuleProperty(
+                                              name="LimitRequests100",
+                                              priority=2,
+                                              action=wafv2.CfnWebACL.RuleActionProperty(
+                                                  block={}),
+                                              statement=wafv2.CfnWebACL.StatementProperty(
+                                                  rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                                                      aggregate_key_type="IP",
+                                                      limit=100
+                                                  )
+                                              ),
+                                              visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                                                  cloud_watch_metrics_enabled=True,
+                                                  metric_name="LimitRequests100Metric",
+                                                  sampled_requests_enabled=True
+                                              )
+                                          )
+                                      ]
+                                      )
+
         api = apigateway.RestApi(
             self,
-            "CompareApi",
+            "IDVerifyAPI",
+            description="ID Verification API",
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=["*"],
                 allow_methods=["POST", "OPTIONS"],
@@ -535,11 +598,12 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        api_key = api.add_api_key("IpsApiKey")
+        api_key = api.add_api_key(
+            "IDVerifyApiKey", description="ID Verification API Key")
 
         usage_plan = api.add_usage_plan(
-            "IpsUsagePlan",
-            name="IPS Usage Plan",
+            "IDVerifyUsagePlan",
+            name="IDVerify Usage Plan",
             throttle=apigateway.ThrottleSettings(
                 rate_limit=10,
                 burst_limit=2,
@@ -570,6 +634,11 @@ class IdPlusSelfieStack(Stack):
                 user=True,
             ).to_string(),
         )
+
+        waf_association = wafv2.CfnWebACLAssociation(self, "WafAssociation",
+                                                     resource_arn=api_stage.stage_arn,
+                                                     web_acl_arn=api_web_acl.attr_arn
+                                                     )
 
         success_response = apigateway.IntegrationResponse(
             status_code="200",

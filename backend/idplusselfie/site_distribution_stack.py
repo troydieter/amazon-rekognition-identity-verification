@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as cloudfront_origins,
     aws_s3_deployment as s3_deployment,
+    aws_wafv2 as wafv2,
     RemovalPolicy,
     CfnOutput,
 )
@@ -44,11 +45,60 @@ class SiteDistributionStack(Stack):
                                         include_subdomains=True, override=True),
                                 ))
 
+        cfn_web_acl = wafv2.CfnWebACL(self, "WebACL",
+            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
+            scope="CLOUDFRONT",
+            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name="WebACLMetric",
+                sampled_requests_enabled=True
+            ),
+            rules=[
+                # AWS Managed Rules for Common Threats
+                wafv2.CfnWebACL.RuleProperty(
+                    name="AWSManagedRulesCommonRuleSet",
+                    priority=1,
+                    override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                            vendor_name="AWS",
+                            name="AWSManagedRulesCommonRuleSet"
+                        )
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="AWSManagedRulesCommonRuleSetMetric",
+                        sampled_requests_enabled=True
+                    )
+                ),
+                # Rate Limiting Rule
+                wafv2.CfnWebACL.RuleProperty(
+                    name="LimitRequests100",
+                    priority=2,
+                    action=wafv2.CfnWebACL.RuleActionProperty(
+                        block={}
+                    ),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                            aggregate_key_type="IP",
+                            limit=100
+                        )
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="LimitRequests100Metric",
+                        sampled_requests_enabled=True
+                    )
+                )
+            ]
+        )
+
         # Create the CloudFront distribution
         site_distribution = cloudfront.Distribution(self, "SiteDistribution",
                                                     price_class=cloudfront.PriceClass.PRICE_CLASS_100,
                                                     default_root_object="index.html",
                                                     comment="CF Distribution for amazon-rekognition-identity-verification",
+                                                    web_acl_id=cfn_web_acl.attr_arn,
                                                     default_behavior=cloudfront.BehaviorOptions(origin=cloudfront_origins.S3BucketOrigin.with_origin_access_control(origin_bucket),
                                                                                                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                                                                                                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
