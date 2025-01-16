@@ -148,7 +148,7 @@ function App() {
     }
   };
   
-  const handleLicenseChange = (e) => {
+  const handleIDChange = (e) => {
     const file = e.target.files[0];
     setidFile(file);
     setidFileName(file ? file.name : "No file chosen");
@@ -194,12 +194,12 @@ function App() {
                 <h3>Upload Identification (U.S. State Identification, Drivers License or Passport)</h3>
                 <input
                   type="file"
-                  id="license-file"
+                  id="id-file"
                   className="file-input"
-                  onChange={handleLicenseChange}
+                  onChange={handleIDChange}
                   accept="image/*"
                 />
-                <label htmlFor="license-file" className="file-label">
+                <label htmlFor="id-file" className="file-label">
                   Choose File
                 </label>
                 <div className="file-name">{idFileName}</div>
