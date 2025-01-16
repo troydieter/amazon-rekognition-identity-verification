@@ -89,9 +89,7 @@ def update_dynamodb_record(verification_id, resized_paths):
         
         # Update DynamoDB with resized image paths and final status
         update_expression = """
-            SET ResizedDLImageS3Key = :dl_resized,
-                ResizedSelfieImageS3Key = :selfie_resized,
-                LastUpdated = :updated,
+            SET LastUpdated = :updated,
                 ResizedAt = :resized_at,
                 StateMachineStatus = :status,
                 ProcessingCompleted = :completed_at,
@@ -99,8 +97,6 @@ def update_dynamodb_record(verification_id, resized_paths):
         """
         
         expression_values = {
-            ':dl_resized': resized_paths['dl'],
-            ':selfie_resized': resized_paths['selfie'],
             ':updated': current_time,
             ':resized_at': current_time,
             ':status': 'COMPLETED_SUCCESSFUL',
