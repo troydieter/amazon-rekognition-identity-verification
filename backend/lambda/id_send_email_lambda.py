@@ -17,7 +17,9 @@ def get_email_content(verification_id, success, details):
     Generate email content based on verification results
     """
     timestamp = details.get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    comparison_results = details.get('comparison_results', {})
+    error_details = details.get('error_details', {})
+    error_messages = details.get('error_messages', {})
+    validation_details = details.get('validation_details', {})
     
     # Common CSS styles
     styles = """
@@ -34,21 +36,13 @@ def get_email_content(verification_id, success, details):
         .detail-row { display: flex; justify-content: space-between; margin: 5px 0; }
         .label { color: #4a5568; }
         .value { font-weight: bold; }
-        /* Override any inherited styles */
+        .validation-section { margin-top: 15px; padding: 10px; background-color: #f8f9fa; }
         a, a:link, a:visited, a:hover, a:active { color: #333333 !important; text-decoration: none; }
         span, span.im { color: #333333 !important; }
         * { color: inherit; }
     """
-    if not success:
-        # Get failure reason from various possible sources
-        failure_reason = (
-            details.get('error') or 
-            comparison_results.get('Message') or 
-            'Verification requirements not met'
-        )
 
     if success:
-        similarity = comparison_results.get('Similarity', 'N/A')
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -74,18 +68,14 @@ def get_email_content(verification_id, success, details):
                                 <span class="label">Timestamp: </span>
                                 <span class="value">{timestamp}</span>
                             </div>
-                            <div class="detail-row">
-                                <span class="label">Face Match: </span>
-                                <span class="value">{similarity}% match</span>
-                            </div>
                         </div>
                     </div>
 
                     <p>All verification checks have passed:</p>
                     <ul>
-                        <li>✓ Face Comparison</li>
+                        <li>✓ ID Document Validation</li>
                         <li>✓ Image Moderation</li>
-                        <li>✓ Image Processing</li>
+                        <li>✓ Face Analysis</li>
                     </ul>
                 </div>
                 <div class="footer">
@@ -96,6 +86,19 @@ def get_email_content(verification_id, success, details):
         </html>
         """
     else:
+        # Construct failure details
+        moderation_status = error_details.get('moderation', {}).get('Status', 'N/A')
+        id_analysis_status = error_details.get('id_analysis', {}).get('Status', 'N/A')
+        
+        # Get validation details for ID analysis
+        id_validation = validation_details.get('id_analysis', {})
+        validation_issues = []
+        
+        if id_validation:
+            for field, data in id_validation.items():
+                if not data.get('present') or data.get('confidence', 0) < 90:
+                    validation_issues.append(f"{field.replace('_', ' ').title()}: Invalid or low confidence")
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -121,25 +124,34 @@ def get_email_content(verification_id, success, details):
                                 <span class="label">Timestamp: </span>
                                 <span class="value">{timestamp}</span>
                             </div>
-                            <div class="detail-row">
-                                <span class="label">Reason: </span>
-                                <span class="value">{details.get('error', 'Verification requirements not met')}</span>
-                            </div>
                         </div>
                     </div>
 
-                    <p>Common reasons for failure:</p>
-                    <ul>
-                        <li>Image quality issues</li>
-                        <li>Face not clearly visible</li>
-                        <li>ID document not clearly visible</li>
-                    </ul>
+                    <div class="validation-section">
+                        <h3>Verification Results:</h3>
+                        <ul>
+                            <li>Moderation Check: {moderation_status}</li>
+                            <li>ID Analysis: {id_analysis_status}</li>
+                        </ul>
+                    """
 
-                    <p>Please try again with new images, ensuring:</p>
+        if validation_issues:
+            html_content += """
+                        <h3>Validation Issues:</h3>
+                        <ul>
+                            """ + "".join([f"<li>{issue}</li>" for issue in validation_issues]) + """
+                        </ul>
+            """
+
+        html_content += f"""
+                    </div>
+
+                    <p>Please ensure:</p>
                     <ul>
-                        <li>Good lighting conditions</li>
-                        <li>Clear, unobstructed view of face/ID</li>
-                        <li>High-quality images</li>
+                        <li>Your ID document is clearly visible</li>
+                        <li>All text on the ID is readable</li>
+                        <li>There is good lighting</li>
+                        <li>The image is not blurry</li>
                     </ul>
                 </div>
                 <div class="footer">
@@ -150,7 +162,7 @@ def get_email_content(verification_id, success, details):
         </html>
         """
 
-    # Plain text version for email clients that don't support HTML
+    # Plain text version
     plain_text = f"""
     ID Verification {'Successful' if success else 'Failed'}
     
@@ -158,8 +170,7 @@ def get_email_content(verification_id, success, details):
     Timestamp: {timestamp}
     Status: {'Passed' if success else 'Failed'}
     
-    {'All verification checks have passed.' if success else 'Please try again with new images.'}
-    
+    {'All verification checks have passed.' if success else 'Verification failed. Please review the issues and try again.'}
     """
 
     return ("ID Verification " + ("Successful" if success else "Failed"), plain_text, html_content)
@@ -173,14 +184,11 @@ def lambda_handler(event, context):
         user_email = event['user_email']
         details = event.get('details', {})
         
-        # Validate email address
         if not user_email:
             raise ValueError("No email address provided")
             
-        # Get email content
         subject, plain_text, html_content = get_email_content(verification_id, success, details)
         
-        # Send email
         response = ses_client.send_email(
             Source=os.environ['FROM_EMAIL_ADDRESS'],
             Destination={
