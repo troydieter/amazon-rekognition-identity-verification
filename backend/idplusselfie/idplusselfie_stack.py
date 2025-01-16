@@ -130,7 +130,7 @@ class IdPlusSelfieStack(Stack):
             write_attributes=cognito.ClientAttributes()
             .with_standard_attributes(
                 email=True
-        )
+            )
         )
 
         # Create Cognito Authorizer
@@ -361,19 +361,10 @@ class IdPlusSelfieStack(Stack):
                 "dl_key.$": "$.dl_key",
                 "timestamp.$": "$$.Execution.StartTime"
             }),
-            result_path="$.id_analysis_result",  # Store result in this path
-            retry_on_service_exceptions=True,
-            retry=stepfunctions.Retry(
-                max_attempts=3,
-                interval=Duration.seconds(2),
-                backoff_rate=2,
-                errors=["Textract.ServiceException",
-                        "Textract.ThrottlingException",
-                        "Textract.InternalServerError"]
-                )
+            result_path="$.id_analysis_result"  # Store result in this path
         )
 
-        compare_faces_task=stepfunctions_tasks.LambdaInvoke(
+        compare_faces_task = stepfunctions_tasks.LambdaInvoke(
             self, "CompareFaces",
             lambda_function=id_compare_faces_lambda,
             payload=stepfunctions.TaskInput.from_object({
@@ -385,7 +376,7 @@ class IdPlusSelfieStack(Stack):
             result_path="$.comparison_result"  # Store result in this path
         )
 
-        resize_task=stepfunctions_tasks.LambdaInvoke(
+        resize_task = stepfunctions_tasks.LambdaInvoke(
             self, "ResizeImages",
             lambda_function=id_resize_lambda,
             payload=stepfunctions.TaskInput.from_object({
@@ -397,7 +388,7 @@ class IdPlusSelfieStack(Stack):
             result_path="$.resize_result"  # Store result in this path
         )
 
-        send_success_email=stepfunctions_tasks.LambdaInvoke(
+        send_success_email = stepfunctions_tasks.LambdaInvoke(
             self, "SendSuccessEmail",
             lambda_function=send_email_lambda,
             payload=stepfunctions.TaskInput.from_object({
@@ -416,7 +407,7 @@ class IdPlusSelfieStack(Stack):
             retry_on_service_exceptions=False
         ).next(success_state)
 
-        send_failure_email=stepfunctions_tasks.LambdaInvoke(
+        send_failure_email = stepfunctions_tasks.LambdaInvoke(
             self, "SendFailureEmail",
             lambda_function=send_email_lambda,
             payload=stepfunctions.TaskInput.from_object({
@@ -440,7 +431,7 @@ class IdPlusSelfieStack(Stack):
             id_trigger_stepfunction_lambda)
 
         # Create the verification process state
-        process_verification=stepfunctions.Pass(
+        process_verification = stepfunctions.Pass(
             self, "ProcessVerification",
             parameters={
                 "status": "PROCESSING",
@@ -454,7 +445,7 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create choice states for each check
-        resize_choice=stepfunctions.Choice(
+        resize_choice = stepfunctions.Choice(
             self, "ResizeCheck"
         ).when(
             stepfunctions.Condition.boolean_equals(
@@ -464,7 +455,7 @@ class IdPlusSelfieStack(Stack):
             send_failure_email
         )
 
-        comparison_choice=stepfunctions.Choice(
+        comparison_choice = stepfunctions.Choice(
             self, "ComparisonCheck"
         ).when(
             stepfunctions.Condition.boolean_equals(
@@ -475,7 +466,7 @@ class IdPlusSelfieStack(Stack):
         )
 
         analyze_id_choice = stepfunctions.Choice(
-        self, "AnalyzeIDCheck"
+            self, "AnalyzeIDCheck"
         ).when(
             stepfunctions.Condition.boolean_equals(
                 '$.id_analysis_result.Payload.success', True),
@@ -484,18 +475,18 @@ class IdPlusSelfieStack(Stack):
             send_failure_email
         )
 
-        moderation_choice=stepfunctions.Choice(
+        moderation_choice = stepfunctions.Choice(
             self, "ModerationCheck"
         ).when(
             stepfunctions.Condition.boolean_equals(
                 '$.moderation_result.Payload.success', True),
-            compare_faces_task.next(analyze_id_choice)
+            analyze_id_task.next(analyze_id_choice)
         ).otherwise(
             send_failure_email
         )
 
         # Define the chain
-        chain=(
+        chain = (
             initial_state
             .next(process_verification)
             .next(moderate_task)
@@ -503,7 +494,7 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create the state machine
-        sm=stepfunctions.StateMachine(
+        sm = stepfunctions.StateMachine(
             self, "StateMachine",
             comment="IDVerification_State_Machine",
             definition_body=stepfunctions.DefinitionBody.from_chainable(chain),
@@ -561,7 +552,7 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        id_delete_lambda=_lambda.Function(
+        id_delete_lambda = _lambda.Function(
             self,
             "IDHandlerDelete",
             code=_lambda.Code.from_asset("lambda"),
@@ -583,7 +574,7 @@ class IdPlusSelfieStack(Stack):
         verification_table.grant_read_write_data(id_upload_lambda)
         verification_table.grant_read_write_data(id_delete_lambda)
 
-        api_web_acl=wafv2.CfnWebACL(self, "ApiWebACL",
+        api_web_acl = wafv2.CfnWebACL(self, "ApiWebACL",
                                       description="API Gateway WAF WEB ACL",
                                       default_action=wafv2.CfnWebACL.DefaultActionProperty(
                                           allow={}),
@@ -639,7 +630,7 @@ class IdPlusSelfieStack(Stack):
                                       ]
                                       )
 
-        api=apigateway.RestApi(
+        api = apigateway.RestApi(
             self,
             "IDVerifyAPI",
             description="ID Verification API",
@@ -655,10 +646,10 @@ class IdPlusSelfieStack(Stack):
             )
         )
 
-        api_key=api.add_api_key(
+        api_key = api.add_api_key(
             "IDVerifyApiKey", description="ID Verification API Key")
 
-        usage_plan=api.add_usage_plan(
+        usage_plan = api.add_usage_plan(
             "IDVerifyUsagePlan",
             name="IDVerify Usage Plan",
             throttle=apigateway.ThrottleSettings(
@@ -670,14 +661,14 @@ class IdPlusSelfieStack(Stack):
         usage_plan.add_api_key(api_key)
         usage_plan.add_api_stage(stage=api.deployment_stage)
 
-        log_group=logs.LogGroup(
+        log_group = logs.LogGroup(
             self,
             "ApiAccessLogs",
             retention=logs.RetentionDays.ONE_WEEK,
         )
 
-        api_stage=api.deployment_stage
-        api_stage.node.default_child.access_log_settings=apigateway.CfnStage.AccessLogSettingProperty(
+        api_stage = api.deployment_stage
+        api_stage.node.default_child.access_log_settings = apigateway.CfnStage.AccessLogSettingProperty(
             destination_arn=log_group.log_group_arn,
             format=apigateway.AccessLogFormat.json_with_standard_fields(
                 caller=True,
@@ -692,12 +683,12 @@ class IdPlusSelfieStack(Stack):
             ).to_string(),
         )
 
-        waf_association=wafv2.CfnWebACLAssociation(self, "WafAssociation",
+        waf_association = wafv2.CfnWebACLAssociation(self, "WafAssociation",
                                                      resource_arn=api_stage.stage_arn,
                                                      web_acl_arn=api_web_acl.attr_arn
                                                      )
 
-        success_response=apigateway.IntegrationResponse(
+        success_response = apigateway.IntegrationResponse(
             status_code="200",
             response_parameters={
                 'method.response.header.Access-Control-Allow-Origin': "'*'",
@@ -706,7 +697,7 @@ class IdPlusSelfieStack(Stack):
             }
         )
 
-        error_response=apigateway.IntegrationResponse(
+        error_response = apigateway.IntegrationResponse(
             status_code="401",
             selection_pattern=".*[UNAUTHORIZED].*",
             response_parameters={
@@ -715,13 +706,13 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Compare Faces - Create
-        id_upload_integration=apigateway.LambdaIntegration(
+        id_upload_integration = apigateway.LambdaIntegration(
             id_upload_lambda,
             proxy=True,
             integration_responses=[success_response, error_response]
         )
 
-        compare_faces_resource=api.root.add_resource("id-verify")
+        compare_faces_resource = api.root.add_resource("id-verify")
         compare_faces_resource.add_method(
             "POST",
             id_upload_integration,
@@ -754,9 +745,9 @@ class IdPlusSelfieStack(Stack):
         )
 
         # ID Verification - Delete
-        id_verify_resource_delete=api.root.add_resource(
+        id_verify_resource_delete = api.root.add_resource(
             "id-verify-delete")
-        id_verify_integration_delete=apigateway.LambdaIntegration(
+        id_verify_integration_delete = apigateway.LambdaIntegration(
             id_delete_lambda,
             proxy=False,
             integration_responses=[
@@ -811,7 +802,7 @@ class IdPlusSelfieStack(Stack):
             authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
-        resources={
+        resources = {
             "TableName": {
                 "value": verification_table.table_name,
                 "description": "The name of the DynamoDB Table"
