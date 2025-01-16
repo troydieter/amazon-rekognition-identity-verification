@@ -21,6 +21,7 @@ function App() {
   const [idFileName, setidFileName] = useState("No file chosen");
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
+  const [isAttested, setIsAttested] = useState(false);
 
   const API_URL = `${process.env.REACT_APP_API_URL}id-verify`;
 
@@ -221,7 +222,28 @@ function App() {
               </div>
             </div>
 
-            <button className="verify-button" onClick={uploadFiles}>
+            <div className="attestation-container">
+              <label className="attestation-label">
+                <input
+                  type="checkbox"
+                  checked={isAttested}
+                  onChange={(e) => setIsAttested(e.target.checked)}
+                  className="attestation-checkbox"
+                />
+                <span className="attestation-text">
+                  I hereby attest, under penalty of perjury, that I am the rightful owner of the 
+                  identification document being submitted, and that the selfie photo is a current 
+                  and accurate representation of myself. I understand that submitting false 
+                  identification or misrepresenting my identity may result in legal consequences.
+                </span>
+              </label>
+            </div>
+
+            <button 
+              className={`verify-button ${!isAttested ? 'verify-button-disabled' : ''}`}
+              onClick={uploadFiles}
+              disabled={!isAttested}
+            >
               Verify Identity
             </button>
           </main>
@@ -230,4 +252,5 @@ function App() {
     </Authenticator>
   );
 }
+
 export default App;
