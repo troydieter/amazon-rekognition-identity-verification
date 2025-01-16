@@ -18,6 +18,21 @@ def get_verification_id_from_key(key):
     """Extract verification ID from S3 key"""
     return key.split('/')[-1].split('.')[0]
 
+def get_file_info_from_key(key):
+    """Extract verification ID and extension from S3 key"""
+    # Split path into parts
+    parts = key.split('/')
+    # Get filename from last part
+    filename = parts[-1]
+    # Split filename into name and extension
+    name_parts = filename.rsplit('.', 1)
+    
+    return {
+        'verification_id': name_parts[0],
+        'extension': name_parts[1] if len(name_parts) > 1 else '',
+        'type': 'identity' if parts[0] == 'identity' else 'selfie'
+    }
+
 def update_upload_status(verification_id, file_type, s3_key):
     """Update DynamoDB record with file upload status"""
     try:
@@ -36,11 +51,17 @@ def update_upload_status(verification_id, file_type, s3_key):
         if response['Items']:
             # Record exists, update it
             item = response['Items'][0]
-            update_expr = f"SET {file_type}Uploaded = :true, {file_type}UploadedAt = :time, LastUpdated = :updated"
+            update_expr = f"""
+                SET {file_type}Uploaded = :true, 
+                    {file_type}UploadedAt = :time, 
+                    LastUpdated = :updated,
+                    {file_type}S3Key = :s3_key
+            """
             expr_values = {
                 ':true': True,
                 ':time': current_time,
-                ':updated': current_time
+                ':updated': current_time,
+                ':s3_key': s3_key
             }
             
             table.update_item(
@@ -54,7 +75,7 @@ def update_upload_status(verification_id, file_type, s3_key):
             
             # Check if both files are now present
             return (
-                item.get('dlUploaded', False) or file_type == 'dl',
+                item.get('identityUploaded', False) or file_type == 'identity',
                 item.get('selfieUploaded', False) or file_type == 'selfie'
             )
             
@@ -64,16 +85,24 @@ def update_upload_status(verification_id, file_type, s3_key):
         logger.error(f"Error updating upload status: {str(e)}")
         raise
 
-def start_state_machine(verification_id, dl_key, selfie_key, user_email):
+def start_state_machine(verification_id, dynamo_record):
     """Start Step Functions state machine"""
     try:
         state_machine_arn = os.environ['STATE_MACHINE_ARN']
+        bucket_name = os.environ['S3_BUCKET_NAME']
+        
+        # Get the actual S3 keys from the DynamoDB record
+        id_key = dynamo_record.get('identityS3Key')
+        selfie_key = dynamo_record.get('selfieS3Key')
+        
+        if not id_key or not selfie_key:
+            raise Exception("Missing S3 keys in DynamoDB record")
         
         input_data = {
             "verification_id": verification_id,
-            "dl_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{dl_key}",
-            "selfie_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{selfie_key}",
-            "user_email": user_email,
+            "id_key": f"s3://{bucket_name}/{id_key}",
+            "selfie_key": f"s3://{bucket_name}/{selfie_key}",
+            "user_email": dynamo_record.get('UserEmail'),
             "status": "PROCESSING",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": True
@@ -100,20 +129,21 @@ def lambda_handler(event, context):
         bucket = record['bucket']['name']
         key = record['object']['key']
         
-        # Determine file type and get verification ID
-        file_type = 'dl' if key.startswith('dl/') else 'selfie'
-        verification_id = get_verification_id_from_key(key)
+        # Get file information including extension
+        file_info = get_file_info_from_key(key)
+        verification_id = file_info['verification_id']
+        file_type = file_info['type']
         
         logger.info(f"Processing {file_type} upload for verification ID: {verification_id}")
         
         # Update upload status and check if both files are present
-        dl_present, selfie_present = update_upload_status(verification_id, file_type, key)
+        id_present, selfie_present = update_upload_status(verification_id, file_type, key)
         
         # If both files are present, start the state machine
-        if dl_present and selfie_present:
+        if id_present and selfie_present:
             logger.info(f"Both files present for verification ID: {verification_id}")
             
-            # Get the user email from the DynamoDB record
+            # Get the record from DynamoDB
             response = table.query(
                 KeyConditionExpression='VerificationId = :vid',
                 ExpressionAttributeValues={
@@ -125,15 +155,11 @@ def lambda_handler(event, context):
             
             if not response['Items']:
                 raise Exception(f"No record found for verification ID: {verification_id}")
-                
-            user_email = response['Items'][0].get('UserEmail')
             
-            # Start the state machine
+            # Start the state machine with actual file paths from DynamoDB
             execution_arn = start_state_machine(
                 verification_id,
-                f"dl/{verification_id}.jpg",
-                f"selfie/{verification_id}.jpg",
-                user_email
+                response['Items'][0]
             )
             
             return {

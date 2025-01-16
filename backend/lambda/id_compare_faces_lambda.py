@@ -139,14 +139,14 @@ def lambda_handler(event, context):
             raise ValueError("S3_BUCKET_NAME environment variable is not set.")
         
         # Extract S3 keys from full URIs
-        dl_key = get_s3_key_from_uri(event['dl_key'])
+        id_key = get_s3_key_from_uri(event['id_key'])
         selfie_key = get_s3_key_from_uri(event['selfie_key'])
         
         # Update initial status
         update_status(verification_id, "COMPARING_FACES")
         
         # Perform face comparison
-        comparison_results = compare_faces(dl_key, selfie_key, bucket_name)
+        comparison_results = compare_faces(id_key, selfie_key, bucket_name)
         
         # Determine success based on match results and minimum similarity threshold
         min_similarity_threshold = Decimal('80')  # 80% similarity threshold

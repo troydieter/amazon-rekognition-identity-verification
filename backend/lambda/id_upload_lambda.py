@@ -54,15 +54,31 @@ def lambda_handler(event, context):
         logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
         return cors_response(500, {'error': "Internal server error"})
 
+def get_file_info_from_base64(base64_data):
+    """Extract file type from base64 data"""
+    # Check if the base64 string contains metadata
+    if ';base64,' in base64_data:
+        metadata, base64_string = base64_data.split(';base64,')
+        if metadata.startswith('data:'):
+            mime_type = metadata.split(':')[1]
+            extension = mime_type.split('/')[-1]
+            # Convert common mime types to extensions
+            if extension == 'jpeg':
+                extension = 'jpg'
+            return base64_string, extension
+    
+    # If no metadata, return the original string and default to jpg
+    return base64_data, 'jpg'
+
 def handle_api_request(body, user_email):
     try:
         logger.info("Handling API Gateway request")
 
         selfie = body.get('selfie')
-        dl = body.get('dl')
+        identity = body.get('identity')
 
-        if not selfie or not dl:
-            raise KeyError('Missing selfie or dl in the request body')
+        if not selfie or not identity:
+            raise KeyError('Missing selfie or identity in the request body')
 
         # Generate current timestamp
         current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -72,20 +88,34 @@ def handle_api_request(body, user_email):
         # Generate UUID for tracking
         verification_id = str(uuid.uuid4())
 
+        # Process base64 data and get file types
+        id_base64, id_extension = get_file_info_from_base64(identity)
+        selfie_base64, selfie_extension = get_file_info_from_base64(selfie)
+
         # Convert base64 to bytes
-        dl_bytes = base64.b64decode(dl)
-        selfie_bytes = base64.b64decode(selfie)
+        id_bytes = base64.b64decode(id_base64)
+        selfie_bytes = base64.b64decode(selfie_base64)
 
-        # Set up S3 keys
-        dl_key = f"dl/{verification_id}.jpg"
-        selfie_key = f"selfie/{verification_id}.jpg"
-        dl_resized_key = f"resized_dl/{verification_id}.jpg"
-        selfie_resized_key = f"resized_selfie/{verification_id}.jpg"
+        # Set up S3 keys with appropriate extensions
+        id_key = f"identity/{verification_id}.{id_extension}"
+        selfie_key = f"selfie/{verification_id}.{selfie_extension}"
+        id_resized_key = f"resized_id/{verification_id}.{id_extension}"
+        selfie_resized_key = f"resized_selfie/{verification_id}.{selfie_extension}"
 
-        # Upload original images to S3
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=dl_key, Body=dl_bytes)
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=selfie_key, Body=selfie_bytes)
-        logger.info(f"Files uploaded to S3: {dl_key}, {selfie_key}")
+        # Upload original images to S3 with content type
+        s3_client.put_object(
+            Bucket=S3_BUCKET_NAME, 
+            Key=id_key, 
+            Body=id_bytes,
+            ContentType=f'image/{id_extension}'
+        )
+        s3_client.put_object(
+            Bucket=S3_BUCKET_NAME, 
+            Key=selfie_key, 
+            Body=selfie_bytes,
+            ContentType=f'image/{selfie_extension}'
+        )
+        logger.info(f"Files uploaded to S3: {id_key}, {selfie_key}")
 
         # Write initial record to DynamoDB
         table = dynamodb.Table(TABLE_NAME)
@@ -94,11 +124,13 @@ def handle_api_request(body, user_email):
             'Status': 'PROCESSING',
             'Timestamp': timestamp,
             'TTL': ttl,
-            'UserEmail': user_email,  # Add user email to the record
-            'DLImageS3Key': f"s3://{S3_BUCKET_NAME}/{dl_key}",
-            'DLImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{dl_resized_key}",
+            'UserEmail': user_email,
+            'IdentificationS3Key': f"s3://{S3_BUCKET_NAME}/{id_key}",
+            'IdentificationImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{id_resized_key}",
             'SelfieImageS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_key}",
-            'SelfieImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_resized_key}"
+            'SelfieImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_resized_key}",
+            'IdentificationExtension': id_extension,
+            'SelfieExtension': selfie_extension
         }
         table.put_item(Item=item)
         logger.info(f"Initial record written to DynamoDB with VerificationId: {verification_id}")

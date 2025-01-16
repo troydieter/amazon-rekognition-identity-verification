@@ -43,8 +43,8 @@ def lambda_handler(event, context):
         # Assuming there's only one item per VerificationId
         item = items[0]
         timestamp = item.get('Timestamp')
-        dl_key = item.get('DLImageS3Key')
-        selfie_key = item.get('SelfieImageS3Key')
+        id_s3_key = item.get('IdentificationS3Key')
+        selfie_s3_key = item.get('SelfieImageS3Key')
 
         # Delete the item from DynamoDB
         table.delete_item(
@@ -55,10 +55,10 @@ def lambda_handler(event, context):
         )
 
         # Delete the objects from S3
-        if dl_key:
-            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=dl_key)
-        if selfie_key:
-            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=selfie_key)
+        if id_s3_key:
+            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=id_s3_key)
+        if selfie_s3_key:
+            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=selfie_s3_key)
 
         logger.info(f"Item with VerificationId {verification_id} and associated S3 objects deleted successfully")
         return cors_response(200, {'message': f"Verification with ID {verification_id} and associated files deleted successfully"})

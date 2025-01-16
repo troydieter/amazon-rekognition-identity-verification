@@ -16,9 +16,9 @@ Amplify.configure({
 });
 
 function App() {
-  const [licenseFile, setLicenseFile] = useState(null);
+  const [idFile, setidFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
-  const [licenseFileName, setLicenseFileName] = useState("No file chosen");
+  const [idFileName, setidFileName] = useState("No file chosen");
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
 
@@ -34,8 +34,8 @@ function App() {
   };
 
   const uploadFiles = async () => {
-    if (!licenseFile || !selfieFile) {
-      alert("Please select both a driver's license and a selfie.");
+    if (!idFile || !selfieFile) {
+      alert("Please select both an ID and a selfie.");
       return;
     }
   
@@ -45,7 +45,7 @@ function App() {
       const { tokens } = await fetchAuthSession();
       const token = tokens.idToken.toString();
       
-      const licenseBase64 = await convertToBase64(licenseFile);
+      const idBase64 = await convertToBase64(idFile);
       const selfieBase64 = await convertToBase64(selfieFile);
       
       const headers = {
@@ -64,7 +64,7 @@ function App() {
         method: 'post',
         url: API_URL,
         data: {
-          dl: licenseBase64,
+          identity: idBase64,
           selfie: selfieBase64,
         },
         headers: headers,
@@ -150,8 +150,8 @@ function App() {
   
   const handleLicenseChange = (e) => {
     const file = e.target.files[0];
-    setLicenseFile(file);
-    setLicenseFileName(file ? file.name : "No file chosen");
+    setidFile(file);
+    setidFileName(file ? file.name : "No file chosen");
   };
 
   const handleSelfieChange = (e) => {
@@ -191,7 +191,7 @@ function App() {
           <main className="app-main">
             <div className="upload-container">
               <div className="upload-box">
-                <h3>Upload Driver's License</h3>
+                <h3>Upload Identification (U.S. State Identification, Drivers License or Passport)</h3>
                 <input
                   type="file"
                   id="license-file"
@@ -202,7 +202,7 @@ function App() {
                 <label htmlFor="license-file" className="file-label">
                   Choose File
                 </label>
-                <div className="file-name">{licenseFileName}</div>
+                <div className="file-name">{idFileName}</div>
               </div>
 
               <div className="upload-box">

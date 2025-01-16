@@ -115,21 +115,21 @@ def lambda_handler(event, context):
             raise ValueError("S3_BUCKET_NAME environment variable is not set.")
         
         # Extract S3 keys from full URIs
-        dl_key = get_s3_key_from_uri(event['dl_key'])
+        id_key = get_s3_key_from_uri(event['id_key'])
         selfie_key = get_s3_key_from_uri(event['selfie_key'])
         
-        logger.info(f"Processing DL image: {dl_key}")
+        logger.info(f"Processing identity image: {id_key}")
         logger.info(f"Processing Selfie image: {selfie_key}")
         
         # Process both images
-        dl_moderation = moderate_image(dl_key, bucket_name)
+        id_moderation = moderate_image(id_key, bucket_name)
         selfie_moderation = moderate_image(selfie_key, bucket_name)
         
         # Combine results
         moderation_results = {
             'Status': 'Moderation Labels Detected',
             'Labels': {
-                'dl_labels': dl_moderation,
+                'id_labels': id_moderation,
                 'selfie_labels': selfie_moderation
             }
         }
@@ -140,7 +140,7 @@ def lambda_handler(event, context):
         # Determine if any concerning labels were found
         concerning_labels = any(
             label['Confidence'] > 80 
-            for labels in [dl_moderation, selfie_moderation] 
+            for labels in [id_moderation, selfie_moderation] 
             for label in labels
         )
         
