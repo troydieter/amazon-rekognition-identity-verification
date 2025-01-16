@@ -54,7 +54,7 @@ def update_upload_status(verification_id, file_type, s3_key):
             
             # Check if both files are now present
             return (
-                item.get('dlUploaded', False) or file_type == 'dl',
+                item.get('dlUploaded', False) or file_type == 'identity',
                 item.get('selfieUploaded', False) or file_type == 'selfie'
             )
             
@@ -64,14 +64,14 @@ def update_upload_status(verification_id, file_type, s3_key):
         logger.error(f"Error updating upload status: {str(e)}")
         raise
 
-def start_state_machine(verification_id, dl_key, selfie_key, user_email):
+def start_state_machine(verification_id, id_key, selfie_key, user_email):
     """Start Step Functions state machine"""
     try:
         state_machine_arn = os.environ['STATE_MACHINE_ARN']
         
         input_data = {
             "verification_id": verification_id,
-            "dl_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{dl_key}",
+            "id_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{id_key}",
             "selfie_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{selfie_key}",
             "user_email": user_email,
             "status": "PROCESSING",
@@ -101,16 +101,16 @@ def lambda_handler(event, context):
         key = record['object']['key']
         
         # Determine file type and get verification ID
-        file_type = 'dl' if key.startswith('dl/') else 'selfie'
+        file_type = 'identity' if key.startswith('identity/') else 'selfie'
         verification_id = get_verification_id_from_key(key)
         
         logger.info(f"Processing {file_type} upload for verification ID: {verification_id}")
         
         # Update upload status and check if both files are present
-        dl_present, selfie_present = update_upload_status(verification_id, file_type, key)
+        id_present, selfie_present = update_upload_status(verification_id, file_type, key)
         
         # If both files are present, start the state machine
-        if dl_present and selfie_present:
+        if id_present and selfie_present:
             logger.info(f"Both files present for verification ID: {verification_id}")
             
             # Get the user email from the DynamoDB record
@@ -131,7 +131,7 @@ def lambda_handler(event, context):
             # Start the state machine
             execution_arn = start_state_machine(
                 verification_id,
-                f"dl/{verification_id}.jpg",
+                f"identity/{verification_id}.jpg",
                 f"selfie/{verification_id}.jpg",
                 user_email
             )

@@ -43,7 +43,7 @@ def lambda_handler(event, context):
         # Assuming there's only one item per VerificationId
         item = items[0]
         timestamp = item.get('Timestamp')
-        dl_key = item.get('DLImageS3Key')
+        id_key = item.get('IdentificationKey')
         selfie_key = item.get('SelfieImageS3Key')
 
         # Delete the item from DynamoDB
@@ -55,8 +55,8 @@ def lambda_handler(event, context):
         )
 
         # Delete the objects from S3
-        if dl_key:
-            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=dl_key)
+        if id_key:
+            s3.delete_object(Bucket=S3_BUCKET_NAME, Key=id_key)
         if selfie_key:
             s3.delete_object(Bucket=S3_BUCKET_NAME, Key=selfie_key)
 

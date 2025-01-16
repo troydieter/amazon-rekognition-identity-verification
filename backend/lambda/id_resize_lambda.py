@@ -215,15 +215,15 @@ def lambda_handler(event, context):
             raise ValueError("S3_BUCKET_NAME environment variable is not set.")
         
         # Extract S3 keys from full URIs
-        dl_key = get_s3_key_from_uri(event['dl_key'])
+        id_key = get_s3_key_from_uri(event['id_key'])
         selfie_key = get_s3_key_from_uri(event['selfie_key'])
         
-        # Process DL image
-        dl_image_data = fetch_image(bucket_name, dl_key)
-        validate_image(dl_image_data)
-        resized_dl = resize_image(dl_image_data)
-        resized_dl_key = f"resized_{dl_key}"
-        resized_dl_path = upload_image(resized_dl, bucket_name, resized_dl_key)
+        # Process identity image
+        id_image_data = fetch_image(bucket_name, id_key)
+        validate_image(id_image_data)
+        resized_id = resize_image(id_image_data)
+        resized_id_key = f"resized_{id_key}"
+        resized_id_path = upload_image(resized_id, bucket_name, resized_id_key)
         
         # Process Selfie image
         selfie_image_data = fetch_image(bucket_name, selfie_key)
@@ -234,7 +234,7 @@ def lambda_handler(event, context):
         
         # Update DynamoDB with resized image paths
         resized_paths = {
-            'dl': resized_dl_path,
+            'identity': resized_id_path,
             'selfie': resized_selfie_path
         }
         update_dynamodb_record(verification_id, resized_paths)

@@ -4,7 +4,7 @@ A robust solution for digital identity verification using Amazon Rekognition.
 
 ## Overview
 
-This project provides a serverless API for comparing a user's selfie with their driver's license photo, leveraging the power of Amazon Rekognition for accurate face matching.
+This project provides a serverless API for comparing a user's selfie with their provided identification, leveraging the power of Amazon Rekognition & Textract for accurate face matching.
 
 ![Frontend01](./docs/front_end01.png)
 ![Frontend02](./docs/front_end02.png)

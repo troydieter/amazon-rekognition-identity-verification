@@ -59,10 +59,10 @@ def handle_api_request(body, user_email):
         logger.info("Handling API Gateway request")
 
         selfie = body.get('selfie')
-        dl = body.get('dl')
+        identity = body.get('identity')
 
-        if not selfie or not dl:
-            raise KeyError('Missing selfie or dl in the request body')
+        if not selfie or not identity:
+            raise KeyError('Missing selfie or identity in the request body')
 
         # Generate current timestamp
         current_time = datetime.datetime.now(datetime.timezone.utc)
@@ -73,19 +73,19 @@ def handle_api_request(body, user_email):
         verification_id = str(uuid.uuid4())
 
         # Convert base64 to bytes
-        dl_bytes = base64.b64decode(dl)
+        id_bytes = base64.b64decode(identity)
         selfie_bytes = base64.b64decode(selfie)
 
         # Set up S3 keys
-        dl_key = f"dl/{verification_id}.jpg"
+        id_key = f"identity/{verification_id}.jpg"
         selfie_key = f"selfie/{verification_id}.jpg"
-        dl_resized_key = f"resized_dl/{verification_id}.jpg"
+        id_resized_key = f"resized_id/{verification_id}.jpg"
         selfie_resized_key = f"resized_selfie/{verification_id}.jpg"
 
         # Upload original images to S3
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=dl_key, Body=dl_bytes)
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=id_key, Body=id_bytes)
         s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=selfie_key, Body=selfie_bytes)
-        logger.info(f"Files uploaded to S3: {dl_key}, {selfie_key}")
+        logger.info(f"Files uploaded to S3: {id_key}, {selfie_key}")
 
         # Write initial record to DynamoDB
         table = dynamodb.Table(TABLE_NAME)
@@ -95,8 +95,8 @@ def handle_api_request(body, user_email):
             'Timestamp': timestamp,
             'TTL': ttl,
             'UserEmail': user_email,  # Add user email to the record
-            'DLImageS3Key': f"s3://{S3_BUCKET_NAME}/{dl_key}",
-            'DLImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{dl_resized_key}",
+            'IdentificationKey': f"s3://{S3_BUCKET_NAME}/{id_key}",
+            'IdentificationImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{id_resized_key}",
             'SelfieImageS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_key}",
             'SelfieImageResizedS3Key': f"s3://{S3_BUCKET_NAME}/{selfie_resized_key}"
         }

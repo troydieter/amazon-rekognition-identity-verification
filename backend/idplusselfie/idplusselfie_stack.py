@@ -58,7 +58,7 @@ class IdPlusSelfieStack(Stack):
                 ),
                 # Expire the original uploads after 30 days
                 s3.LifecycleRule(
-                    prefix="dl/",
+                    prefix="identity/",
                     expiration=Duration.days(30)
                 ),
                 s3.LifecycleRule(
@@ -335,7 +335,7 @@ class IdPlusSelfieStack(Stack):
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
                 "user_email.$": "$.user_email",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "selfie_key.$": "$.selfie_key",
                 "success": True
             }
@@ -346,7 +346,7 @@ class IdPlusSelfieStack(Stack):
             lambda_function=id_moderate_lambda,
             payload=stepfunctions.TaskInput.from_object({
                 "verification_id.$": "$.verification_id",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "selfie_key.$": "$.selfie_key",
                 "timestamp.$": "$$.Execution.StartTime"
             }),
@@ -358,7 +358,7 @@ class IdPlusSelfieStack(Stack):
             lambda_function=id_analyze_lambda,
             payload=stepfunctions.TaskInput.from_object({
                 "verification_id.$": "$.verification_id",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "timestamp.$": "$$.Execution.StartTime"
             }),
             result_path="$.id_analysis_result"  # Store result in this path
@@ -369,7 +369,7 @@ class IdPlusSelfieStack(Stack):
             lambda_function=id_compare_faces_lambda,
             payload=stepfunctions.TaskInput.from_object({
                 "verification_id.$": "$.verification_id",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "selfie_key.$": "$.selfie_key",
                 "timestamp.$": "$$.Execution.StartTime"
             }),
@@ -381,7 +381,7 @@ class IdPlusSelfieStack(Stack):
             lambda_function=id_resize_lambda,
             payload=stepfunctions.TaskInput.from_object({
                 "verification_id.$": "$.verification_id",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "selfie_key.$": "$.selfie_key",
                 "timestamp.$": "$$.Execution.StartTime"
             }),
@@ -438,7 +438,7 @@ class IdPlusSelfieStack(Stack):
                 "timestamp.$": "$$.Execution.StartTime",
                 "verification_id.$": "$.verification_id",
                 "user_email.$": "$.user_email",
-                "dl_key.$": "$.dl_key",
+                "id_key.$": "$.id_key",
                 "selfie_key.$": "$.selfie_key",
                 "success": True
             }
@@ -540,7 +540,7 @@ class IdPlusSelfieStack(Stack):
             s3.EventType.OBJECT_CREATED_PUT,
             s3n.LambdaDestination(id_trigger_stepfunction_lambda),
             s3.NotificationKeyFilter(
-                prefix="dl/"
+                prefix="identity/"
             )
         )
 

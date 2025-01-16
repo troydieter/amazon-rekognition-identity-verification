@@ -156,12 +156,12 @@ def lambda_handler(event, context):
             raise ValueError("S3_BUCKET_NAME environment variable is not set.")
         
         # Extract S3 key from full URI
-        dl_key = get_s3_key_from_uri(event['dl_key'])
+        id_key = get_s3_key_from_uri(event['id_key'])
         
-        logger.info(f"Processing ID document: {dl_key}")
+        logger.info(f"Processing ID document: {id_key}")
         
         # Analyze ID document
-        analysis_results = analyze_id_document(dl_key, bucket_name)
+        analysis_results = analyze_id_document(id_key, bucket_name)
         
         if not analysis_results:
             return {
