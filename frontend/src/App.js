@@ -22,7 +22,7 @@ function App() {
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
 
-  const API_URL = `${process.env.REACT_APP_API_URL}/id-verify`;
+  const API_URL = `${process.env.REACT_APP_API_URL}id-verify`;
 
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {

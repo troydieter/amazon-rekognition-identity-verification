@@ -705,7 +705,7 @@ class IdPlusSelfieStack(Stack):
             },
             "ApiEndpoint_id-verify": {
                 "value": f"{api.url}id-verify",
-                "description": "Endpoint for face comparison",
+                "description": "Endpoint for ID Verification",
                 "export_name": f"{self.stack_name}-ApiEndpoint-id-verify"
             },
             "ApiEndpoint_id-verify-delete": {

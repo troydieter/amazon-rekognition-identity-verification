@@ -44,8 +44,7 @@ def lambda_handler(event, context):
                     claims = event['requestContext']['authorizer']['claims']
                     user_email = claims.get('email')
                     given_name = claims.get('given_name')  # Extract first name
-                    family_name = claims.get(
-                        'family_name')  # Extract last name
+                    family_name = claims.get('family_name')  # Extract last name
 
         logger.info(f"User email from Cognito: {user_email}")
         logger.info(f"User first name: {given_name}")
