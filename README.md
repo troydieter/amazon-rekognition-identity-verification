@@ -46,7 +46,7 @@ This project provides a serverless API for comparing a user's selfie with their 
 # Setup
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
 
-This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.175.1`) for infrastructure as code. Follow these steps to deploy:
+This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.176.0`) for infrastructure as code. Follow these steps to deploy:
 
 1. Ensure you have an AWS account and an AWS IAM user/role with appropriate permissions.
 
