@@ -84,7 +84,6 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create the Cognito User Pool
-        # Create Cognito User Pool
         user_pool = cognito.UserPool(
             self, "IdentityUserPool",
             self_sign_up_enabled=True,
@@ -99,6 +98,14 @@ class IdPlusSelfieStack(Stack):
             ),
             standard_attributes=cognito.StandardAttributes(
                 email=cognito.StandardAttribute(
+                    required=True,
+                    mutable=True
+                ),
+                given_name=cognito.StandardAttribute(
+                    required=True,
+                    mutable=True
+                ),
+                family_name=cognito.StandardAttribute(
                     required=True,
                     mutable=True
                 )
@@ -250,7 +257,7 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 # You must change this to a value you own
-                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
+                "FROM_EMAIL_ADDRESS": "ID_Verify@nwsl.me"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )

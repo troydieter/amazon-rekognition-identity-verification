@@ -162,17 +162,27 @@ function App() {
 
   const formFields = {
     signUp: {
-      email: {
+      given_name: {
         order: 1,
+        placeholder: "First Name"
+      },
+      family_name: {
+        order: 2,
+        placeholder: "Last Name"
+      },
+      email: {
+        order: 3,
+        placeholder: "Email Address"
       },
       username: {
-        order: 2,
+        order: 4,
+        placeholder: "Username (first.last)"
       },
       password: {
-        order: 3,
+        order: 5,
       },
       confirm_password: {
-        order: 4,
+        order: 6,
       },
     },
   };
