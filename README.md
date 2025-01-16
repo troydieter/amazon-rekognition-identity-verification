@@ -9,39 +9,17 @@ This project provides a serverless API for comparing a user's selfie with their 
 ![Frontend01](./docs/front_end01.png)
 ![Frontend02](./docs/front_end02.png)
 
-#### Confirmation of match:
-![Confirm](./docs/confirm_yes.png)
+#### Email Response - Verified
+![Verified](./docs/id_verified.png)
 
-#### No match found:
-![Fail](./docs/fail_confirmation.png)
+#### Email Response - Failed to Verify
+![Failed to Verify](./docs/id_failed_verify.png)
 
 ## Architecture
 
 ### AWS Solution Architecture
-#### /id-verify
-![Visual AWS Architecture](./docs/diagram01.png)
-1. User uploads files (ID + Selfie) to the system.
-2. Amazon API Gateway receives the POST request at the `/prod/CompareApi` endpoint.
-3. IAM Role assumes the necessary permissions for the Lambda function.
-4. CloudWatch Logs record the Lambda function's execution details.
-5. The AWS Lambda function uses the AWS SDK to interact with Amazon Rekognition.
-6. The Rekognition response is stored in a DynamoDB table with the `VerificationId` attribute in the item. The object is also stored in Amazon S3 for post-processing. (see: the purple boxes shown to the right)
-7. Amazon Rekognition processes the images and returns a response (box at the bottom).
-
-#### /id-verify-delete
-![Visual AWS Architecture](./docs/diagram02.png)
-1. Admin user receives a request to delete an identity that has been verified. They retrieve the `VerificationId` value as initially registered by the user.
-2. A `DELETE` API call is made to API Gateway with `VerificationId` as a parameter and the necessary `x-api-key` value in the header.
-3. IAM Role assumes the necessary permissions for the Lambda function.
-4. CloudWatch Logs record the Lambda function's execution details.
-5. The item in the DynamoDB table, based on the primary key `VerificationId` is deleted along with the Amazon S3 objects (one of each). The response is sent back via the API call that it has been deleted successfully.
-
-#### /id-verify-resizing
-![Visual AWS Architecture](./docs/diagram03.png)
-1. The drivers license (ID) and selfie are uploaded.
-2. CloudWatch Logs record the Lambda function's execution details. The `eventSourceMapping` for Amazon S3 objects occurs, invoking the function.
-3. IAM Role assumes the necessary permissions for the Lambda function.
-4. The file is resized and optimized, and stored in the `dl_resized` or `selfie_resized` key (directories) in the Amazon S3 upload bucket. The lifecycle policy applies for 1yr/optimized and 30days/original.
+#### AWS Step Functions Workflow
+![Workflow](./docs/workflow.png)
 
 # Setup
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
