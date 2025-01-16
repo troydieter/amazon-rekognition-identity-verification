@@ -418,7 +418,6 @@ class IdPlusSelfieStack(Stack):
                     "verification_id.$": "$.verification_id",
                     "timestamp.$": "$.timestamp",
                     "error_details": {
-                        # Simplified JSONPath expressions
                         "moderation": {
                             "status.$": "$.moderation_result.Payload.success",
                             "results.$": "$.moderation_result.Payload.moderation_results"
@@ -434,12 +433,11 @@ class IdPlusSelfieStack(Stack):
                     },
                     "validation_details": {
                         "id_analysis.$": "$.id_analysis_result.Payload.analysis_results.validation",
-                        "moderation_results.$": "$.moderation_result.Payload.moderation_results.Labels"
+                        "moderation_labels.$": "$.moderation_result.Payload.moderation_results.Labels"
                     }
                 }
             })
         ).next(fail_state)
-
 
         # Grant permissions
         upload_bucket.grant_read(id_trigger_stepfunction_lambda)
