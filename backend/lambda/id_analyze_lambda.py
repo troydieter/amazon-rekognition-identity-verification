@@ -31,9 +31,9 @@ def extract_field_value(fields, field_type):
         if field['Type']['Text'] == field_type:
             return {
                 'Text': field['ValueDetection'].get('Text', ''),
-                'Confidence': float(Decimal(str(field['ValueDetection'].get('Confidence', 0))).quantize(Decimal('.01')))
+                'Confidence': Decimal(str(field['ValueDetection'].get('Confidence', 0))).quantize(Decimal('.01'))
             }
-    return {'Text': '', 'Confidence': 0.0}
+    return {'Text': '', 'Confidence': Decimal('0')}
 
 def analyze_id_document(photo, bucket):
     """
@@ -58,18 +58,26 @@ def analyze_id_document(photo, bucket):
         
         # Extract relevant fields with confidence scores
         fields_to_extract = [
-            'FIRST_NAME', 'LAST_NAME', 'DATE_OF_BIRTH', 'EXPIRATION_DATE',
-            'DOCUMENT_NUMBER', 'ADDRESS', 'CITY_IN_ADDRESS', 'STATE_IN_ADDRESS',
-            'ZIP_CODE_IN_ADDRESS', 'ID_TYPE'
+            'FIRST_NAME', 'LAST_NAME', 'MIDDLE_NAME',
+            'DATE_OF_BIRTH', 'EXPIRATION_DATE', 'DOCUMENT_NUMBER',
+            'ADDRESS', 'CITY_IN_ADDRESS', 'STATE_IN_ADDRESS',
+            'ZIP_CODE_IN_ADDRESS', 'ID_TYPE', 'STATE_NAME'
         ]
         
         extracted_fields = {}
         for field in fields_to_extract:
             result = extract_field_value(id_fields, field)
-            extracted_fields[field.lower()] = result
+            extracted_fields[field.lower()] = {
+                'text': result['Text'],
+                'confidence': result['Confidence']
+            }
             logger.info(f"{field}: {result['Text']} (Confidence: {result['Confidence']})")
             
-        return extracted_fields
+        return {
+            'fields': extracted_fields,
+            'document_present': True,
+            'raw_response': response
+        }
         
     except Exception as e:
         logger.error(f"Error analyzing ID document {photo} in bucket {bucket}: {str(e)}")
@@ -98,20 +106,26 @@ def update_dynamodb_record(verification_id, analysis_results):
         timestamp = response['Items'][0]['Timestamp']
         current_time = Decimal(str(datetime.now(timezone.utc).timestamp()))
         
+        # Prepare update expression and values
         update_expression = """
             SET IDAnalysisResults = :results,
                 IDAnalysisStatus = :status,
                 LastUpdated = :updated,
-                AnalyzedAt = :analyzed_at
+                AnalyzedAt = :analyzed_at,
+                DocumentType = :doc_type,
+                DocumentNumber = :doc_number
         """
         
         expression_values = {
-            ':results': analysis_results['Fields'],
-            ':status': analysis_results['Status'],
+            ':results': analysis_results['fields'],
+            ':status': 'COMPLETED',
             ':updated': current_time,
-            ':analyzed_at': current_time
+            ':analyzed_at': current_time,
+            ':doc_type': analysis_results['fields'].get('id_type', {}).get('text', 'UNKNOWN'),
+            ':doc_number': analysis_results['fields'].get('document_number', {}).get('text', 'UNKNOWN')
         }
         
+        # Update DynamoDB
         table.update_item(
             Key={
                 'VerificationId': verification_id,
@@ -130,7 +144,7 @@ def update_dynamodb_record(verification_id, analysis_results):
 
 def lambda_handler(event, context):
     """
-    AWS Lambda handler for processing ID analysis as part of Step Functions workflow.
+    AWS Lambda handler for processing ID analysis as part of Step Functions workflow
     """
     try:
         logger.info(f"Received event: {json.dumps(event)}")
@@ -150,33 +164,52 @@ def lambda_handler(event, context):
         analysis_results = analyze_id_document(dl_key, bucket_name)
         
         if not analysis_results:
-            raise ValueError("No valid ID document found in image")
+            return {
+                'statusCode': 400,
+                'verification_id': verification_id,
+                'success': False,
+                'error': "No valid ID document found in image"
+            }
         
-        # Prepare results
-        id_analysis = {
-            'Status': 'ID Analysis Complete',
-            'Fields': analysis_results
-        }
-        
-        # Update DynamoDB
-        update_dynamodb_record(verification_id, id_analysis)
+        # Update DynamoDB with results
+        update_dynamodb_record(verification_id, analysis_results)
         
         # Check if all required fields are present with acceptable confidence
         required_fields = ['first_name', 'last_name', 'date_of_birth', 'expiration_date']
-        confidence_threshold = 90.0
+        confidence_threshold = Decimal('90.0')
+        
+        validation_results = {
+            field: {
+                'present': bool(analysis_results['fields'][field]['text']),
+                'confidence': analysis_results['fields'][field]['confidence']
+            }
+            for field in required_fields
+        }
         
         valid_id = all(
-            analysis_results[field]['Text'] and 
-            analysis_results[field]['Confidence'] >= confidence_threshold
+            validation_results[field]['present'] and 
+            validation_results[field]['confidence'] >= confidence_threshold
             for field in required_fields
         )
         
-        return {
+        response = {
             'statusCode': 200,
             'verification_id': verification_id,
             'success': valid_id,
-            'analysis_results': id_analysis
+            'analysis_results': {
+                'fields': {
+                    k: v for k, v in analysis_results['fields'].items()
+                    if k in ['first_name', 'last_name', 'date_of_birth', 'expiration_date', 
+                            'document_number', 'id_type']
+                },
+                'validation': validation_results
+            }
         }
+        
+        if not valid_id:
+            response['error'] = "One or more required fields failed validation"
+            
+        return response
         
     except Exception as e:
         logger.error(f"Error processing ID analysis: {str(e)}")
