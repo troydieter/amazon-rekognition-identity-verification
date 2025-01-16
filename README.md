@@ -66,14 +66,35 @@ Before you begin, ensure you have the following installed:
      ```
      cp .env.example.env .env
      ```
-   - Open the `.env` file and replace the placeholder values with your API Gateway URL, API Key and Cognito Userpool ClientID, ID and AWS region.
-     ```
-      REACT_APP_API_URL=https://example.execute-api.REGION.amazonaws.com/prod
-      REACT_APP_API_KEY=xyz123
-      REACT_APP_USERPOOL_CLIENTID=example123
-      REACT_APP_USERPOOL_ID=us-east-1_example
-      REACT_APP_REGION=us-east-1
+   - Open the `.env` file and replace the placeholder values with the CloudFormation outputs you seen in the terminal. It'll look like this:
+   
+      CFN Outputs:
       ```
+         idplusselfieStack.ApiEndpointidverify = https://vluem241ef.execute-api.us-east-1.amazonaws.com/prod/id-verify
+         idplusselfieStack.ApiEndpointidverifydelete = https://vluem311ef.execute-api.us-east-1.amazonaws.com/prod/id-verify-delete
+         idplusselfieStack.ApiId = vluem311ef
+         idplusselfieStack.ApiKeyId = 89zd13md369
+         idplusselfieStack.ApiName = CompareApi
+         idplusselfieStack.ApiUrl = https://vlue313341ef.execute-api.us-east-1.amazonaws.com/prod/
+         idplusselfieStack.CompareApiEndpointDE9BAFE9 = https://vl314m341ef.execute-api.us-east-1.amazonaws.com/prod/
+         idplusselfieStack.StateMachineArn = arn:aws:states:us-east-1:550767824695:stateMachine:StateMachine2E01A3A5-3epBHl7DlSTJ
+         idplusselfieStack.TableName = idplusselfieStack-VerificationTableF9AA0134-AO2HGOY09MPB
+         idplusselfieStack.UploadBucketName = idplusselfiestack-uploadbucketd2c1da78-2el125bdqnxa
+         idplusselfieStack.UserPoolClientId = 2ma0bcs04424o359bqf1bqec4s8
+         idplusselfieStack.UserPoolId = us-east-1_Sx6CA4P0z
+      ```
+
+      You'll need these values: `idplusselfieStack.ApiUrl`, the API Key (retrieved from Api Gateway), `idplusselfieStack.UserPoolClientId`, `idplusselfieStack.UserPoolId`, and the AWS region you're deploying to.
+
+      ```
+         REACT_APP_API_URL=https://example.execute-api.REGION.amazonaws.com/prod/
+         REACT_APP_API_KEY=xyz123
+         REACT_APP_USERPOOL_CLIENTID=example123
+         REACT_APP_USERPOOL_ID=us-east-1_example
+         REACT_APP_REGION=us-east-1
+      ```
+
+   **NOTE**: Make sure the `API_URL` value has the trailing slash. 
 
 4. Build it:
    ```

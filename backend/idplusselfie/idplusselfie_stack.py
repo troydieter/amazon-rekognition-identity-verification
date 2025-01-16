@@ -84,7 +84,6 @@ class IdPlusSelfieStack(Stack):
         )
 
         # Create the Cognito User Pool
-        # Create Cognito User Pool
         user_pool = cognito.UserPool(
             self, "IdentityUserPool",
             self_sign_up_enabled=True,
@@ -250,7 +249,7 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 # You must change this to a value you own
-                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
+                "FROM_EMAIL_ADDRESS": "ID_Verify@nwsl.me"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
@@ -686,62 +685,71 @@ class IdPlusSelfieStack(Stack):
             authorization_type=apigateway.AuthorizationType.COGNITO
         )
 
-        # Outputs to assist debugging and deployment
-        self.output_cfn_info(verification_table, api, api_key,
-                             upload_bucket, user_pool, user_pool_client)
+        resources = {
+            "TableName": {
+                "value": verification_table.table_name,
+                "description": "The name of the DynamoDB Table"
+            },
+            "ApiUrl": {
+                "value": api.url,
+                "description": "URL of the API Gateway",
+                "export_name": f"{self.stack_name}-ApiUrl"
+            },
+            "ApiEndpoint_id-verify": {
+                "value": f"{api.url}id-verify",
+                "description": "Endpoint for ID Verification",
+                "export_name": f"{self.stack_name}-ApiEndpoint-id-verify"
+            },
+            "ApiEndpoint_id-verify-delete": {
+                "value": f"{api.url}id-verify-delete",
+                "description": "Endpoint for deletion of a previous comparison",
+                "export_name": f"{self.stack_name}-ApiEndpoint-id-verify-delete"
+            },
+            "ApiKeyId": {
+                "value": api_key.key_id,
+                "description": "ID of the API Key",
+                "export_name": f"{self.stack_name}-ApiKeyId"
+            },
+            "ApiName": {
+                "value": api.rest_api_name,
+                "description": "Name of the API",
+                "export_name": f"{self.stack_name}-ApiName"
+            },
+            "ApiId": {
+                "value": api.rest_api_id,
+                "description": "ID of the API",
+                "export_name": f"{self.stack_name}-ApiId"
+            },
+            "StateMachineArn": {
+                "value": sm.state_machine_arn,
+                "description": "ARN of the ID Verification Step Functions State Machine",
+                "export_name": "StateMachineArn"
+            },
+            "UploadBucketName": {
+                "value": upload_bucket.bucket_name,
+                "description": "The name of the generated bucket"
+            },
+            "UserPoolId": {
+                "value": user_pool.user_pool_id,
+                "description": "ID of the Cognito User Pool",
+                "export_name": f"{self.stack_name}-UserPoolId"
+            },
+            "UserPoolClientId": {
+                "value": user_pool_client.user_pool_client_id,
+                "description": "ID of the Cognito User Pool Client",
+                "export_name": f"{self.stack_name}-UserPoolClientId"
+            }
+        }
 
-    def output_cfn_info(self, verification_table, api, api_key, upload_bucket, user_pool, user_pool_client):
-        CfnOutput(
-            self, "TableName", value=verification_table.table_name, description="The name of the DynamoDB Table"
-        )
-        CfnOutput(self, "ApiUrl",
-                  value=api.url,
-                  description="URL of the API Gateway",
-                  export_name=f"{self.stack_name}-ApiUrl"
-                  )
+        self.output_cfn_info(resources)
 
-        CfnOutput(self, "ApiEndpoint_id-verify",
-                  value=f"{api.url}id-verify",
-                  description="Endpoint for face comparison",
-                  export_name=f"{self.stack_name}-ApiEndpoint-id-verify"
-                  )
-
-        CfnOutput(self, "ApiEndpoint_id-verify-delete",
-                  value=f"{api.url}id-verify-delete",
-                  description="Endpoint for deletion of a previous comparison",
-                  export_name=f"{
-                      self.stack_name}-ApiEndpoint-id-verify-delete"
-                  )
-
-        CfnOutput(self, "ApiKeyId",
-                  value=api_key.key_id,
-                  description="ID of the API Key",
-                  export_name=f"{self.stack_name}-ApiKeyId"
-                  )
-
-        CfnOutput(self, "ApiName",
-                  value=api.rest_api_name,
-                  description="Name of the API",
-                  export_name=f"{self.stack_name}-ApiName"
-                  )
-
-        CfnOutput(self, "ApiId",
-                  value=api.rest_api_id,
-                  description="ID of the API",
-                  export_name=f"{self.stack_name}-ApiId"
-                  )
-
-        CfnOutput(self, "UploadBucketName", value=upload_bucket.bucket_name,
-                  description="The name of the generated bucket")
-
-        CfnOutput(self, "UserPoolId",
-                  value=user_pool.user_pool_id,
-                  description="ID of the Cognito User Pool",
-                  export_name=f"{self.stack_name}-UserPoolId"
-                  )
-
-        CfnOutput(self, "UserPoolClientId",
-                  value=user_pool_client.user_pool_client_id,
-                  description="ID of the Cognito User Pool Client",
-                  export_name=f"{self.stack_name}-UserPoolClientId"
-                  )
+    # Outputs to assist debugging and deployment
+    def output_cfn_info(self, resources):
+        for key, metadata in resources.items():
+            CfnOutput(
+                self,
+                key,
+                value=metadata["value"],
+                description=metadata["description"],
+                export_name=metadata.get("export_name")
+            )
