@@ -127,3 +127,48 @@ body {
     padding: 0.75rem;
   }
 }
+
+.attestation-container {
+  margin: 20px auto;
+  max-width: 600px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border: 1px solid #dee2e6;
+}
+
+.attestation-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.attestation-checkbox {
+  margin-top: 4px;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.attestation-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #495057;
+  text-align: left;
+}
+
+.verify-button-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Optional: Add hover effect for the container */
+.attestation-container:hover {
+  background-color: #e9ecef;
+}
+
+/* Optional: Style the checkbox when checked */
+.attestation-checkbox:checked {
+  accent-color: #007bff;
+}
