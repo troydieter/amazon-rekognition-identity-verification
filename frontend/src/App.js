@@ -22,7 +22,7 @@ function App() {
   const [selfieFileName, setSelfieFileName] = useState("No file chosen");
   const [count, setCount] = useState(0);
 
-  const API_URL = `${process.env.REACT_APP_API_URL}id-verify`;
+  const API_URL = `${process.env.REACT_APP_API_URL}/id-verify`;
 
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -162,27 +162,17 @@ function App() {
 
   const formFields = {
     signUp: {
-      given_name: {
-        order: 1,
-        placeholder: "First Name"
-      },
-      family_name: {
-        order: 2,
-        placeholder: "Last Name"
-      },
       email: {
-        order: 3,
-        placeholder: "Email Address"
+        order: 1,
       },
       username: {
-        order: 4,
-        placeholder: "Username (first.last)"
+        order: 2,
       },
       password: {
-        order: 5,
+        order: 3,
       },
       confirm_password: {
-        order: 6,
+        order: 4,
       },
     },
   };

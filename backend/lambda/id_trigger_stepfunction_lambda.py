@@ -64,7 +64,7 @@ def update_upload_status(verification_id, file_type, s3_key):
         logger.error(f"Error updating upload status: {str(e)}")
         raise
 
-def start_state_machine(verification_id, dl_key, selfie_key, user_email, given_name, family_name):
+def start_state_machine(verification_id, dl_key, selfie_key, user_email):
     """Start Step Functions state machine"""
     try:
         state_machine_arn = os.environ['STATE_MACHINE_ARN']
@@ -74,8 +74,6 @@ def start_state_machine(verification_id, dl_key, selfie_key, user_email, given_n
             "dl_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{dl_key}",
             "selfie_key": f"s3://{os.environ['S3_BUCKET_NAME']}/{selfie_key}",
             "user_email": user_email,
-            "given_name": given_name,
-            "family_name": family_name,
             "status": "PROCESSING",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": True
@@ -129,17 +127,13 @@ def lambda_handler(event, context):
                 raise Exception(f"No record found for verification ID: {verification_id}")
                 
             user_email = response['Items'][0].get('UserEmail')
-            given_name = response['Items'][0].get('GivenName')
-            family_name = response['Items'][0].get('FamilyName')
             
             # Start the state machine
             execution_arn = start_state_machine(
                 verification_id,
                 f"dl/{verification_id}.jpg",
                 f"selfie/{verification_id}.jpg",
-                user_email,
-                given_name,
-                family_name
+                user_email
             )
             
             return {
