@@ -124,8 +124,13 @@ class IdPlusSelfieStack(Stack):
             ),
             read_attributes=cognito.ClientAttributes()
             .with_standard_attributes(
+                email=True,
+                email_verified=True
+            ),
+            write_attributes=cognito.ClientAttributes()
+            .with_standard_attributes(
                 email=True
-            )
+        )
         )
 
         # Create Cognito Authorizer
