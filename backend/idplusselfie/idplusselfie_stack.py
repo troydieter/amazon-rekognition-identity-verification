@@ -250,7 +250,7 @@ class IdPlusSelfieStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",  # Add a log level for runtime control
                 # You must change this to a value you own
-                "FROM_EMAIL_ADDRESS": "ID_Verify@nwsl.me"
+                "FROM_EMAIL_ADDRESS": "ID_Verify@awsuser.group"
             },
             log_retention=logs.RetentionDays.ONE_WEEK,  # Set log retention period
         )
@@ -522,6 +522,7 @@ class IdPlusSelfieStack(Stack):
         verification_table.grant_read_write_data(id_delete_lambda)
 
         api_web_acl = wafv2.CfnWebACL(self, "ApiWebACL",
+                                      description="API Gateway WAF WEB ACL",
                                       default_action=wafv2.CfnWebACL.DefaultActionProperty(
                                           allow={}),
                                       scope="REGIONAL",
@@ -539,7 +540,15 @@ class IdPlusSelfieStack(Stack):
                                               statement=wafv2.CfnWebACL.StatementProperty(
                                                   managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
                                                       vendor_name="AWS",
-                                                      name="AWSManagedRulesCommonRuleSet"
+                                                      name="AWSManagedRulesCommonRuleSet",
+                                                      rule_action_overrides=[
+                                                          wafv2.CfnWebACL.RuleActionOverrideProperty(
+                                                              name="SizeRestrictions_BODY",
+                                                              action_to_use=wafv2.CfnWebACL.RuleActionProperty(
+                                                                  allow={}
+                                                              )
+                                                          )
+                                                      ]
                                                   )
                                               ),
                                               visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
