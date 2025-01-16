@@ -716,8 +716,7 @@ class IdPlusSelfieStack(Stack):
         CfnOutput(self, "ApiEndpoint_id-verify-delete",
                   value=f"{api.url}id-verify-delete",
                   description="Endpoint for deletion of a previous comparison",
-                  export_name=f"{
-                      self.stack_name}-ApiEndpoint-id-verify-delete"
+                  export_name=f"{self.stack_name}-ApiEndpoint-id-verify-delete"
                   )
 
         CfnOutput(self, "ApiKeyId",
