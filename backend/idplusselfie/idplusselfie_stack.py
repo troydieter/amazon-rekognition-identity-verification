@@ -371,6 +371,7 @@ class IdPlusSelfieStack(Stack):
                         "Textract.ThrottlingException",
                         "Textract.InternalServerError"]
                 )
+        )
 
         compare_faces_task=stepfunctions_tasks.LambdaInvoke(
             self, "CompareFaces",
