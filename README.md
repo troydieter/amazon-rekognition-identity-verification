@@ -19,7 +19,9 @@ This project provides a serverless API for comparing a user's selfie with their 
 
 ### AWS Solution Architecture
 #### AWS Step Functions Workflow
-![Workflow](./docs/workflow.png)
+![Success](./docs/sf_success.png)
+
+![Failure](./docs/sf_fail.png)
 
 # Setup
 ## 01 - Deployment - Backend (`IdPlusSelfieStack`)
