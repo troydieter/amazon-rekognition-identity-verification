@@ -34,9 +34,10 @@ This project is deployed using [AWS CDK](https://github.com/aws/aws-cdk) (`2.176
 
 3. Install AWS CDK: [CDK Python Guide](https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-python.html)
 
-4. Change directory to the backend:
+4. Change directory to the backend and create the Python virtual environment :
    ```
    cd backend
+   python -m venv .venv
    ```
 
 4. Navigate to the project directory and create a virtual environment:
